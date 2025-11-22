@@ -66,6 +66,7 @@ export class SimpleStorage {
       user_id: userId,
       email: userData.email || null,
       phone_number: userData.phone_number || null,
+      mom_phone_number: userData.mom_phone_number || null,
       twitter_handle: userData.twitter_handle || null,
       settings: userData.settings || {},
       created_at: new Date().toISOString(),

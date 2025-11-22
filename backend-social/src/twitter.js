@@ -27,13 +27,17 @@ export class TwitterService {
     // This is a simplified version for demonstration
     // You should use a library like 'oauth-1.0a' or implement proper HMAC-SHA1
     
-    const crypto = await import('crypto');
+    // Use Web Crypto API (compatible with Cloudflare Workers)
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    const nonce = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    
     const oauth = {
       oauth_consumer_key: this.apiKey,
       oauth_token: this.accessToken,
       oauth_signature_method: 'HMAC-SHA1',
       oauth_timestamp: Math.floor(Date.now() / 1000),
-      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_nonce: nonce,
       oauth_version: '1.0',
       ...params,
     };
@@ -100,6 +104,91 @@ export class TwitterService {
   }
 
   /**
+   * Post a tweet with image using Twitter API v2
+   * First uploads image, then posts tweet with media_id
+   */
+  async postTweetWithImage(text, imageData, userId = null) {
+    if (!this.isConfigured) {
+      // Fallback: return mock response if not configured
+      console.warn('Twitter API not configured. Returning mock response.');
+      return {
+        success: true,
+        tweet_id: `mock_${Date.now()}`,
+        url: `https://twitter.com/mock/status/${Date.now()}`,
+        message: 'Mock tweet with image posted (Twitter API not configured)',
+      };
+    }
+
+    try {
+      let mediaId = null;
+
+      // If image data is provided, upload it first
+      if (imageData) {
+        // Twitter Media API endpoint (v1.1)
+        const mediaEndpoint = 'https://upload.twitter.com/1.1/media/upload.json';
+        
+        // Upload image
+        const formData = new FormData();
+        formData.append('media', imageData);
+
+        const mediaResponse = await fetch(mediaEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.bearerToken}`,
+          },
+          body: formData,
+        });
+
+        if (mediaResponse.ok) {
+          const mediaData = await mediaResponse.json();
+          mediaId = mediaData.media_id_string;
+        } else {
+          console.warn('Failed to upload image, posting tweet without image');
+        }
+      }
+
+      // Post tweet with or without image
+      const endpoint = `${this.apiUrl}/tweets`;
+      const payload = {
+        text: text,
+      };
+
+      if (mediaId) {
+        payload.media = {
+          media_ids: [mediaId],
+        };
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.bearerToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(`Twitter API error: ${error.detail || response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      return {
+        success: true,
+        tweet_id: data.data.id,
+        url: `https://twitter.com/i/web/status/${data.data.id}`,
+        message: 'Tweet with image posted successfully',
+      };
+    } catch (error) {
+      console.error('Error posting tweet with image:', error);
+      // Fallback to posting without image
+      return await this.postTweet(text, userId);
+    }
+  }
+
+  /**
    * Post a tweet with OAuth 1.0a (if Bearer token doesn't work)
    * Requires proper OAuth library for production
    */
@@ -146,7 +235,7 @@ export class TwitterService {
   async postEmbarrassingStats(stats, userHandle = null) {
     const handle = userHandle ? `@${userHandle} ` : '';
     
-    const message = `📊 SNOOZE STATS OF THE DAY 📊\n\n${handle}Today's wake-up performance:\n• Total snoozes: ${stats.total_snoozes}\n• Longest snooze session: ${stats.longest_snooze_session}\n• Most common excuse: "${stats.most_common_excuse || 'None recorded'}"\n\nImpressive. Very impressive. 🏆\n\n#SnoozeStats #SleepGoals #NotReally`,
+    const message = `📊 SNOOZE STATS OF THE DAY 📊\n\n${handle}Today's wake-up performance:\n• Total snoozes: ${stats.total_snoozes}\n• Longest snooze session: ${stats.longest_snooze_session}\n• Most common excuse: "${stats.most_common_excuse || 'None recorded'}"\n\nImpressive. Very impressive. 🏆\n\n#SnoozeStats #SleepGoals #NotReally`;
     
     return await this.postTweet(message);
   }

@@ -142,6 +142,14 @@ async function handleSnoozeEvent(request, db, escalation, integration) {
   }
 
   try {
+    // Get or create user with mom_phone_number
+    const user = await db.getOrCreateUser(body.user_id, {
+      email: body.email || null,
+      phone_number: body.phone_number || null,
+      mom_phone_number: body.mom_phone_number || null,
+      twitter_handle: body.twitter_handle || null,
+    });
+
     // Record snooze in database
     const snoozeRecord = await db.recordSnooze(body.user_id, {
       alarm_time: body.alarm_time || new Date().toISOString(),
@@ -153,14 +161,29 @@ async function handleSnoozeEvent(request, db, escalation, integration) {
       sentiment: body.sentiment || null,
     });
 
+    // Prepare context with image data if provided (for snooze 5)
+    const context = {
+      excuse: body.excuse,
+      snoozeRecord,
+    };
+
+    // If image data is provided (base64), convert it to a format Twitter can use
+    if (body.image_data && body.image_type) {
+      // Convert base64 to Blob for Twitter API
+      const binaryString = atob(body.image_data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: body.image_type });
+      context.imageData = blob;
+    }
+
     // Check escalation thresholds and trigger actions
     const escalationResult = await escalation.checkAndTrigger(
       body.user_id,
       body.snooze_count,
-      {
-        excuse: body.excuse,
-        snoozeRecord,
-      }
+      context
     );
 
     // Get user's embarrassing stats
@@ -210,6 +233,7 @@ async function handleSnoozeCount(request, db, escalation, integration) {
     const user = await db.getOrCreateUser(body.user_id, {
       email: body.email || null,
       phone_number: body.phone_number || null,
+      mom_phone_number: body.mom_phone_number || null,
       twitter_handle: body.twitter_handle || null,
     });
 

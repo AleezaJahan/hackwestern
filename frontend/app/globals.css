@@ -59,3 +59,33 @@ body {
   animation: shake 0.5s ease-in-out;
 }
 
+/* Ensure input fields have readable text color */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+input[type="password"],
+textarea {
+  color: rgb(17, 24, 39) !important; /* text-gray-900 */
+  background-color: white !important;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="tel"]::placeholder,
+input[type="number"]::placeholder,
+input[type="password"]::placeholder,
+textarea::placeholder {
+  color: rgb(156, 163, 175) !important; /* text-gray-400 */
+}
+
+input[type="text"]:disabled,
+input[type="email"]:disabled,
+input[type="tel"]:disabled,
+input[type="number"]:disabled,
+input[type="password"]:disabled,
+textarea:disabled {
+  color: rgb(107, 114, 128) !important; /* text-gray-500 */
+  background-color: rgb(243, 244, 246) !important; /* bg-gray-100 */
+}
+

@@ -9,11 +9,18 @@ class Config:
     
     # ElevenLabs Configuration
     ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
-    ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "")
+    ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Default: Rachel
     ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1"
+    
+    # Voice IDs - Voice Selection Strategy
+    VOICE_GENTLE = os.getenv("VOICE_GENTLE", "21m00Tcm4TlvDq8ikWAM")  # Rachel - natural, expressive
+    VOICE_SARCASTIC = os.getenv("VOICE_SARCASTIC", "EXAVITQu4vr4xnSDxMaL")  # Bella - friendly female
+    VOICE_AGGRESSIVE = os.getenv("VOICE_AGGRESSIVE", "pNInz6obpgDQGcFmaJgB")  # Antoni - confident male
+    VOICE_DRILL_SERGEANT = os.getenv("VOICE_DRILL_SERGEANT", "pNInz6obpgDQGcFmaJgB")  # For nuclear
     
     # Google Gemini Configuration
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")  # Using latest flash model
     
     # VAPI Configuration
     VAPI_API_KEY = os.getenv("VAPI_API_KEY", "")

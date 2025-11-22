@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { triggerAlarm, handleSnooze, notifySocialBackend } from '@/lib/api'
 import { getSettings, getUserId } from '@/lib/storage'
-import { formatTime, getMinutesUntilAlarm, isAlarmTimePassed } from '@/lib/utils'
-import AudioPlayer from '@/components/AudioPlayer'
+import { formatTime, formatDateTime, formatDateTimeLocal, getMinutesUntilAlarm, isAlarmTimePassed } from '@/lib/utils'
+import AudioPlayer, { AudioPlayerRef } from '@/components/AudioPlayer'
+import AlarmSound from '@/components/AlarmSound'
 import RoastDisplay from '@/components/RoastDisplay'
 import SnoozeCounter from '@/components/SnoozeCounter'
 import SocialMediaThreat from '@/components/SocialMediaThreat'
@@ -24,6 +25,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false)
   const [wakeUpTime, setWakeUpTime] = useState<Date | null>(null)
   const excuseInputRef = useRef<HTMLInputElement>(null)
+  const audioPlayerRef = useRef<AudioPlayerRef>(null)
   const settings = getSettings()
   const userId = getUserId()
 
@@ -98,8 +100,25 @@ export default function Home() {
       setExcuse('')
       
       // Notify Person 4's backend (Social Media)
+      let imageData: File | null = null;
+      if (newSnoozeCount >= 5) {
+        // At snooze 5, automatically get random image from camera roll
+        try {
+          const { getRandomImageFromCameraRoll } = await import('@/lib/api');
+          imageData = await getRandomImageFromCameraRoll();
+          if (imageData) {
+            toast.success('📸 Random image selected from camera roll!');
+          } else {
+            toast.warning('⚠️ No image found, posting stats without image');
+          }
+        } catch (error) {
+          console.error('Error getting image:', error);
+          toast.warning('⚠️ Could not access camera roll, posting without image');
+        }
+      }
+      
       if (newSnoozeCount >= 3) {
-        await notifySocialBackend(userId, newSnoozeCount, now)
+        await notifySocialBackend(userId, newSnoozeCount, now, imageData, settings.mom_phone_number)
       }
 
       // Check if threshold reached
@@ -135,13 +154,30 @@ export default function Home() {
     setCurrentRoast(undefined)
     setCurrentAnalysis(undefined)
     setAudioUrl(undefined)
-    toast.success(`Alarm set for ${formatTime(new Date(alarmTime))}`)
+    toast.success(`Alarm set for ${formatDateTime(new Date(alarmTime))}`)
   }
 
   const handleStopAlarm = () => {
+    // Stop alarm sound (AlarmSound component will stop when isActive becomes false)
     setIsAlarmActive(false)
+    
+    // Stop voice message audio
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.stop()
+    }
+    setAudioUrl(undefined)
+    
+    // Reset all alarm state to go back to main page
     setWakeUpTime(null)
-    toast.success('Alarm stopped!')
+    setSnoozeCount(0)
+    setCurrentRoast(undefined)
+    setCurrentAnalysis(undefined)
+    setExcuse('')
+    
+    // Reset alarm time so user can set a new one
+    setAlarmTime('')
+    
+    toast.success('Alarm stopped! You can set a new alarm.')
   }
 
   const nextThreshold = getNextThreshold(snoozeCount)
@@ -180,10 +216,18 @@ export default function Home() {
                 </label>
                 <input
                   type="datetime-local"
-                  value={alarmTime}
-                  onChange={(e) => setAlarmTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  min={new Date().toISOString().slice(0, 16)}
+                  value={alarmTime ? formatDateTimeLocal(alarmTime) : ''}
+                  onChange={(e) => {
+                    // Ensure the value is in correct format
+                    const value = e.target.value;
+                    if (value) {
+                      setAlarmTime(value);
+                    } else {
+                      setAlarmTime('');
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                  min={formatDateTimeLocal(new Date())}
                 />
               </div>
               <button
@@ -195,9 +239,14 @@ export default function Home() {
               </button>
             </div>
             {alarmTime && (
-              <p className="mt-4 text-sm text-gray-600">
-                Alarm will go off in {getMinutesUntilAlarm(alarmTime)} minutes
-              </p>
+              <div className="mt-4 space-y-1">
+                <p className="text-sm font-semibold text-gray-700">
+                  Alarm set for: {formatDateTime(new Date(alarmTime))}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Alarm will go off in {getMinutesUntilAlarm(alarmTime)} minutes
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -205,15 +254,18 @@ export default function Home() {
         {/* Active Alarm */}
         {isAlarmActive && (
           <div className="bg-red-100 border-4 border-red-500 rounded-lg shadow-lg p-6 animate-pulse-slow">
+            {/* Blaring Alarm Sound - plays continuously */}
+            <AlarmSound isActive={isAlarmActive} volume={0.6} />
+            
             <div className="text-center mb-6">
               <h2 className="text-4xl font-bold text-red-800 mb-2">🔔 WAKE UP! 🔔</h2>
               <p className="text-xl text-red-700">Your alarm is ringing!</p>
             </div>
 
-            {/* Audio Player */}
+            {/* Audio Player - plays voice message */}
             {audioUrl && (
               <div className="mb-6">
-                <AudioPlayer audioUrl={audioUrl} autoPlay />
+                <AudioPlayer ref={audioPlayerRef} audioUrl={audioUrl} autoPlay />
               </div>
             )}
 
@@ -233,7 +285,7 @@ export default function Home() {
                   }
                 }}
                 placeholder="e.g., Just 5 more minutes..."
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg text-gray-900 bg-white"
                 disabled={isLoading}
               />
             </div>

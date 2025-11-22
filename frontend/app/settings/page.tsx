@@ -96,7 +96,7 @@ export default function SettingsPage() {
               value={settings.email || ''}
               onChange={(e) => handleChange('email', e.target.value)}
               placeholder="your.email@example.com"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
             />
             <p className="mt-1 text-xs text-gray-500">
               Used for account identification (optional)
@@ -116,13 +116,38 @@ export default function SettingsPage() {
                 handleChange('phone_number', cleaned)
               }}
               placeholder="1234567890"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
             />
             <p className="mt-1 text-xs text-gray-500">
               Used for SMS threats. Format: 10 digits (no dashes or spaces)
               {settings.phone_number && (
                 <span className="block mt-1">
                   Formatted: {formatPhoneNumber(settings.phone_number)}
+                </span>
+              )}
+            </p>
+          </div>
+
+          {/* Mom's Phone Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Mom's Phone Number (Optional)
+            </label>
+            <input
+              type="tel"
+              value={settings.mom_phone_number || ''}
+              onChange={(e) => {
+                const cleaned = e.target.value.replace(/\D/g, '')
+                handleChange('mom_phone_number', cleaned)
+              }}
+              placeholder="1234567890"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Will receive text at snooze 4: "degenerate is not waking up"
+              {settings.mom_phone_number && (
+                <span className="block mt-1">
+                  Formatted: {formatPhoneNumber(settings.mom_phone_number)}
                 </span>
               )}
             </p>
@@ -143,7 +168,7 @@ export default function SettingsPage() {
                   handleChange('twitter_handle', cleaned)
                 }}
                 placeholder="your_handle"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
               />
             </div>
             <p className="mt-1 text-xs text-gray-500">
@@ -166,7 +191,7 @@ export default function SettingsPage() {
                   handleChange('crush_twitter_handle', cleaned)
                 }}
                 placeholder="their_handle"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
               />
             </div>
             <p className="mt-1 text-xs text-gray-500">

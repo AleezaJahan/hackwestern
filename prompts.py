@@ -19,7 +19,24 @@ def get_snooze_level(snooze_count: int) -> str:
     else:
         return "nuclear"
 
-# Initial alarm wake-up messages
+# Initial alarm wake-up messages - Matching specification exactly
+def get_alarm_message(snooze_count: int, user_name: str = "there") -> str:
+    """Generate alarm message based on snooze count - matching specification."""
+    messages = {
+        0: f"Good morning {user_name}. Time to wake up. I know you will, you're responsible.",
+        1: "Seriously? Already hitting snooze? Interesting choice.",
+        2: "Wow, twice. Your crush would be so impressed by your time management.",
+        3: "Three times. Should I start drafting that tweet now?",
+        4: "This is your final warning. Twitter is loading as we speak."
+    }
+    
+    # For snooze count > 4, use nuclear messages
+    if snooze_count >= 5:
+        return f"ENOUGH! You've snoozed {snooze_count} times. This is pathetic. GET UP OR I'M POSTING YOUR SNOOZE STATS!"
+    
+    return messages.get(snooze_count, messages[4])
+
+# Initial alarm wake-up messages (legacy format for compatibility)
 ALARM_MESSAGES = {
     "mild": [
         "Good morning! Time to rise and shine. You've got this!",

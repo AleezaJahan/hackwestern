@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
 import { getAudioUrl } from '@/lib/api'
 
 interface AudioPlayerProps {
@@ -9,10 +9,33 @@ interface AudioPlayerProps {
   onEnded?: () => void
 }
 
-export default function AudioPlayer({ audioUrl, autoPlay = false, onEnded }: AudioPlayerProps) {
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export interface AudioPlayerRef {
+  stop: () => void
+  pause: () => void
+}
+
+const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
+  ({ audioUrl, autoPlay = false, onEnded }, ref) => {
+    const audioRef = useRef<HTMLAudioElement>(null)
+    const [isPlaying, setIsPlaying] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+
+    // Expose stop method to parent
+    useImperativeHandle(ref, () => ({
+      stop: () => {
+        if (audioRef.current) {
+          audioRef.current.pause()
+          audioRef.current.currentTime = 0
+          setIsPlaying(false)
+        }
+      },
+      pause: () => {
+        if (audioRef.current) {
+          audioRef.current.pause()
+          setIsPlaying(false)
+        }
+      },
+    }))
 
   useEffect(() => {
     if (!audioUrl) return
@@ -91,5 +114,9 @@ export default function AudioPlayer({ audioUrl, autoPlay = false, onEnded }: Aud
       )}
     </div>
   )
-}
+})
+
+AudioPlayer.displayName = 'AudioPlayer'
+
+export default AudioPlayer
 

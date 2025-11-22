@@ -7,6 +7,7 @@ export interface StoredSettings {
   user_id: string;
   email?: string;
   phone_number?: string;
+  mom_phone_number?: string;
   twitter_handle?: string;
   crush_twitter_handle?: string;
   snooze_tolerance?: number;

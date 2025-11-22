@@ -3,7 +3,7 @@ import os
 import requests
 from typing import Optional
 from config import Config
-from prompts import get_snooze_level, ALARM_MESSAGES
+from prompts import get_snooze_level, ALARM_MESSAGES, get_alarm_message
 import random
 
 class ElevenLabsService:
@@ -13,6 +13,13 @@ class ElevenLabsService:
         self.api_key = Config.ELEVENLABS_API_KEY
         self.voice_id = Config.ELEVENLABS_VOICE_ID
         self.api_url = Config.ELEVENLABS_API_URL
+        
+        # Voice personalities - Voice Selection Strategy
+        self.voice_personalities = {
+            "disappointed_parent": Config.VOICE_GENTLE,  # Rachel - for mild
+            "sarcastic_friend": Config.VOICE_SARCASTIC,  # Bella - for moderate
+            "drill_sergeant": Config.VOICE_AGGRESSIVE,   # Antoni - for aggressive
+        }
         
     def generate_voice(
         self, 
@@ -52,9 +59,10 @@ class ElevenLabsService:
         }
         
         # Adjust voice parameters based on snooze level for snarky personality
+        # Using eleven_turbo_v2_5 as specified - Fast, natural
         data = {
             "text": text,
-            "model_id": "eleven_multilingual_v2",
+            "model_id": "eleven_turbo_v2_5",  # Updated to match specification
             "voice_settings": {
                 "stability": stability,
                 "similarity_boost": similarity_boost,
@@ -68,54 +76,84 @@ class ElevenLabsService:
         
         return response.content
     
-    def generate_alarm_message(self, snooze_count: int = 0) -> str:
+    def generate_alarm_message(self, snooze_count: int = 0, user_name: str = "there") -> str:
         """Generate appropriate alarm message based on snooze count.
+        
+        Args:
+            snooze_count: Number of times user has snoozed
+            user_name: Optional user name for personalization
+            
+        Returns:
+            Message text to be converted to speech
+        """
+        # Use the specification-exact messages
+        return get_alarm_message(snooze_count, user_name)
+    
+    def select_voice(self, snooze_count: int) -> str:
+        """Select voice based on snooze count - Voice Selection Strategy.
         
         Args:
             snooze_count: Number of times user has snoozed
             
         Returns:
-            Message text to be converted to speech
+            Voice ID to use
         """
-        level = get_snooze_level(snooze_count)
-        messages = ALARM_MESSAGES.get(level, ALARM_MESSAGES["mild"])
-        
-        # Select random message or format with snooze count if needed
-        message = random.choice(messages)
-        if "{count}" in message:
-            message = message.format(count=snooze_count)
-            
-        return message
+        if snooze_count <= 1:
+            return self.voice_personalities["disappointed_parent"]  # Rachel - gentle
+        elif snooze_count <= 3:
+            return self.voice_personalities["sarcastic_friend"]  # Bella - sarcastic
+        else:
+            return self.voice_personalities["drill_sergeant"]  # Antoni - aggressive
     
-    def generate_audio_for_text(self, text: str, snooze_count: int = 0) -> bytes:
+    def generate_audio_for_text(self, text: str, snooze_count: int = 0, voice_id: Optional[str] = None) -> bytes:
         """Generate audio for given text with appropriate voice settings.
         
         Args:
             text: Text to convert to speech
-            snooze_count: Number of snoozes (affects voice tone)
+            snooze_count: Number of snoozes (affects voice tone and selection)
+            voice_id: Optional voice ID (if not provided, selects based on snooze_count)
             
         Returns:
             Audio bytes
         """
         level = get_snooze_level(snooze_count)
         
+        # Select voice based on snooze count if not provided
+        if not voice_id:
+            voice_id = self.select_voice(snooze_count)
+        
         # Adjust voice parameters based on snooze level
         # More aggressive = more expressive voice
+        # Using specification values: stability: 0.5, similarity_boost: 0.75, style: 0.6
         voice_settings = {
-            "mild": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.0},
-            "moderate": {"stability": 0.4, "similarity_boost": 0.8, "style": 0.3},
-            "aggressive": {"stability": 0.3, "similarity_boost": 0.85, "style": 0.6},
-            "nuclear": {"stability": 0.2, "similarity_boost": 0.9, "style": 0.9}
+            "mild": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.2},
+            "moderate": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.6},
+            "aggressive": {"stability": 0.4, "similarity_boost": 0.8, "style": 0.7},
+            "nuclear": {"stability": 0.3, "similarity_boost": 0.85, "style": 0.9}
         }
         
-        settings = voice_settings.get(level, voice_settings["mild"])
+        settings = voice_settings.get(level, voice_settings["moderate"])
         
         return self.generate_voice(
             text=text,
+            voice_id=voice_id,
             stability=settings["stability"],
             similarity_boost=settings["similarity_boost"],
             style=settings["style"]
         )
+    
+    def generate_alarm_voice(self, snooze_count: int, user_name: str = "there") -> bytes:
+        """Generate alarm voice message - matching specification flow.
+        
+        Args:
+            snooze_count: Number of times user has snoozed
+            user_name: User name for personalization
+            
+        Returns:
+            Audio bytes (MP3 format)
+        """
+        message = self.generate_alarm_message(snooze_count, user_name)
+        return self.generate_audio_for_text(message, snooze_count)
     
     def save_audio(self, audio_data: bytes, filename: str) -> str:
         """Save audio data to file.

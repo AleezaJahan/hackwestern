@@ -17,6 +17,6 @@
   "author": "Carmen + paridhi",
   "license": "MIT",
   "devDependencies": {
-    "wrangler": "^3.114.15"
+    "wrangler": "^4.50.0"
   }
 }

@@ -121,21 +121,29 @@ async def health():
 async def trigger_alarm(request: AlarmTriggerRequest):
     """Generate snarky voice message when alarm triggers.
     
-    This endpoint is called when the alarm initially goes off or when user snoozes.
+    This endpoint is called when the alarm initially goes off.
+    Matches specification: generateAlarmVoice(snoozeCount, userName)
     """
     try:
         elevenlabs = get_elevenlabs_service()
         
-        # Generate appropriate message based on snooze count
-        message = elevenlabs.generate_alarm_message(request.snooze_count)
+        # Get user name from request or use default
+        user_name = getattr(request, 'user_name', None) or "there"
         
-        # Generate audio
-        audio_data = elevenlabs.generate_audio_for_text(message, request.snooze_count)
+        # Generate appropriate message based on snooze count (matching specification)
+        message = elevenlabs.generate_alarm_message(request.snooze_count, user_name)
+        
+        # Generate audio using specification method
+        audio_data = elevenlabs.generate_alarm_voice(request.snooze_count, user_name)
         
         # Save audio file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"alarm_{request.snooze_count}_{timestamp}.mp3"
         audio_path = elevenlabs.save_audio(audio_data, filename)
+        
+        # Also provide base64 data URL for frontend
+        import base64
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
         
         # Return audio URL and metadata
         level = get_snooze_level(request.snooze_count)
@@ -166,7 +174,10 @@ async def get_audio(filename: str):
     return StreamingResponse(
         iterfile(),
         media_type="audio/mpeg",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Allow-Origin": "*",  # CORS for audio files
+        }
     )
 
 
@@ -249,35 +260,55 @@ async def analyze_excuse_sentiment(request: ExcuseAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"Error analyzing sentiment: {str(e)}")
 
 
+@app.post("/api/alarm/snooze")
+async def api_alarm_snooze(request: SnoozeRequest, background_tasks: BackgroundTasks):
+    """Combined API endpoint matching specification - /api/alarm/snooze.
+    
+    Main API Route: /api/alarm/snooze
+    Flow: Generate roast with Gemini → Convert to voice with ElevenLabs → Return both
+    """
+    return await handle_snooze(request, background_tasks)
+
+
 @app.post("/snooze")
 async def handle_snooze(request: SnoozeRequest, background_tasks: BackgroundTasks):
-    """Handle snooze event - combines excuse analysis and alarm generation."""
+    """Handle snooze event - combines excuse analysis and alarm generation.
+    
+    This is the main combined API endpoint matching the specification.
+    Flow: Generate roast with Gemini → Convert to voice with ElevenLabs → Return both
+    """
     try:
         gemini = get_gemini_service()
         elevenlabs = get_elevenlabs_service()
         analyzer = get_sentiment_analyzer()
         
-        # Analyze excuse and generate roast
-        result = gemini.generate_combined_response(request.excuse, request.snooze_count)
+        # Step 1: Generate roast with Gemini (matches specification)
+        result = gemini.generate_combined_response(request.excuse or "", request.snooze_count)
+        roast_text = result.get("roast", "")
         
-        # Analyze sentiment if transcribed audio is provided
-        sentiment_result = None
-        if request.transcribed_audio:
-            sentiment_result = analyzer.analyze_sentiment(request.transcribed_audio)
-        
-        # Generate roast audio
-        roast_text = result["roast"]
+        # Step 2: Convert roast to voice with ElevenLabs (matches specification)
         audio_data = elevenlabs.generate_audio_for_text(roast_text, request.snooze_count)
         
-        # Save audio file
+        # Step 3: Save to storage (or could stream directly)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"snooze_{request.snooze_count}_{timestamp}.mp3"
         audio_path = elevenlabs.save_audio(audio_data, filename)
         
-        level = get_snooze_level(request.snooze_count)
+        # Step 4: Read audio as base64 for data URL (matching specification format)
+        import base64
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        audio_data_url = f"data:audio/mpeg;base64,{audio_base64}"
         
-        # Pass snooze data to Person 4's backend (social media threat)
-        # Notify at >= 3 snoozes to match frontend notification threshold
+        # Step 5: Analyze sentiment if transcribed audio is provided
+        sentiment_result = None
+        if request.transcribed_audio:
+            sentiment_result = analyzer.analyze_sentiment(request.transcribed_audio)
+        
+        level = get_snooze_level(request.snooze_count)
+        escalation_level = "critical" if request.snooze_count >= 3 else "warning"
+        
+        # Step 6: Store stats in database (via Person 4 backend)
+        # Notify Person 4 at snooze_count >= 3 to trigger SMS threat
         if request.snooze_count >= 3:
             background_tasks.add_task(
                 notify_social_media_backend,
@@ -289,12 +320,15 @@ async def handle_snooze(request: SnoozeRequest, background_tasks: BackgroundTask
                 sentiment_result
             )
         
+        # Step 7: Return both text and audio (matching specification)
         response_data = {
-            "analysis": result["analysis"],
-            "roast": roast_text,
-            "audio_url": f"/audio/{filename}",
+            "roastText": roast_text,
+            "audioUrl": audio_data_url,  # Base64 data URL
+            "audio_url": f"/audio/{filename}",  # Also provide file URL for compatibility
+            "escalationLevel": escalation_level,
             "snooze_count": request.snooze_count,
-            "level": level
+            "level": level,
+            "analysis": result.get("analysis", {})
         }
         
         if sentiment_result:

@@ -11,12 +11,12 @@ export class EscalationService {
     this.twitter = twitter;
     this.twilio = twilio;
     
-    // Escalation thresholds
+    // Escalation thresholds - Updated per requirements
     this.thresholds = {
-      threatSMS: 3,        // Send SMS threat at 3 snoozes
-      socialMediaThreat: 5, // Generate social media threat at 5 snoozes
-      postToTwitter: 7,     // Actually post to Twitter at 7 snoozes
-      nuclear: 10,          // Nuclear option at 10 snoozes
+      insults: 3,          // Snoozes 1-3: insults (handled by Person 2 backend)
+      textMom: 4,          // Snooze 4: Send text to mom
+      postToTwitter: 5,    // Snooze 5: Post embarrassing stats on Twitter with image
+      nuclear: 10,         // Nuclear option at 10 snoozes (if needed)
     };
   }
 
@@ -52,51 +52,28 @@ export class EscalationService {
       // Get user info
       const user = await this.db.getOrCreateUser(userId);
 
-      // Check SMS threat threshold
-      if (snoozeCount >= this.thresholds.threatSMS && user.phone_number) {
-        const smsResult = await this.sendThreatSMS(user, snoozeCount, context);
+      // Check text mom threshold (snooze 4)
+      if (snoozeCount >= this.thresholds.textMom && user.mom_phone_number) {
+        const momSMSResult = await this.sendTextToMom(user, snoozeCount, context);
         actions.push({
-          type: 'sms_threat',
-          threshold: this.thresholds.threatSMS,
-          result: smsResult,
+          type: 'text_mom',
+          threshold: this.thresholds.textMom,
+          result: momSMSResult,
         });
         actionTaken = true;
 
         // Record escalation trigger
         await this.db.recordEscalationTrigger(userId, {
-          snooze_threshold: this.thresholds.threatSMS,
-          action_type: 'sms_threat',
-          executed: smsResult.success,
-          execution_result: smsResult,
+          snooze_threshold: this.thresholds.textMom,
+          action_type: 'text_mom',
+          executed: momSMSResult.success,
+          execution_result: momSMSResult,
         });
       }
 
-      // Check social media threat threshold
-      if (snoozeCount >= this.thresholds.socialMediaThreat) {
-        const threatResult = await this.generateSocialMediaThreat(
-          userId,
-          snoozeCount,
-          new Date().toISOString()
-        );
-        actions.push({
-          type: 'social_media_threat',
-          threshold: this.thresholds.socialMediaThreat,
-          result: threatResult,
-        });
-        actionTaken = true;
-
-        // Record escalation trigger
-        await this.db.recordEscalationTrigger(userId, {
-          snooze_threshold: this.thresholds.socialMediaThreat,
-          action_type: 'social_media_threat',
-          executed: threatResult.generated,
-          execution_result: threatResult,
-        });
-      }
-
-      // Check Twitter post threshold (actually post)
+      // Check Twitter post threshold (snooze 5) - Post embarrassing stats with image
       if (snoozeCount >= this.thresholds.postToTwitter) {
-        const postResult = await this.postToTwitter(user, snoozeCount, context);
+        const postResult = await this.postToTwitterWithImage(user, snoozeCount, context);
         actions.push({
           type: 'twitter_post',
           threshold: this.thresholds.postToTwitter,
@@ -111,16 +88,6 @@ export class EscalationService {
           executed: postResult.success,
           execution_result: postResult,
         });
-
-        // Send nuclear SMS after posting
-        if (user.phone_number && postResult.success) {
-          await this.twilio.sendNuclearSMS(
-            user.phone_number,
-            snoozeCount,
-            postResult.url,
-            user.email || null
-          );
-        }
       }
 
       // Check nuclear threshold (post embarrassing stats)
@@ -239,6 +206,55 @@ export class EscalationService {
   }
 
   /**
+   * Post to Twitter with image at snooze 5
+   */
+  async postToTwitterWithImage(user, snoozeCount, context = {}) {
+    try {
+      const stats = await this.db.getEmbarrassingStats(user.user_id);
+      const wakeUpTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+      // Generate embarrassing stats message
+      let message;
+      if (stats) {
+        message = `📊 SNOOZE STATS OF THE DAY 📊\n\n${user.twitter_handle ? `@${user.twitter_handle} ` : ''}Today's wake-up performance:\n• Total snoozes: ${stats.total_snoozes}\n• Longest snooze session: ${stats.longest_snooze_session}\n• Most common excuse: "${stats.most_common_excuse || 'None recorded'}"\n\nImpressive. Very impressive. 🏆\n\n#SnoozeStats #SleepGoals #NotReally`;
+      } else {
+        message = this.twitter.generateThreatMessage(
+          snoozeCount,
+          wakeUpTime,
+          user.twitter_handle || null
+        );
+      }
+
+      // Get image from context (sent from frontend)
+      const imageData = context.imageData || null;
+
+      // Post to Twitter with image
+      const postResult = await this.twitter.postTweetWithImage(message, imageData, user.user_id);
+
+      if (postResult.success) {
+        // Record in database
+        await this.db.recordSocialMediaPost(user.user_id, {
+          snooze_count: snoozeCount,
+          post_type: 'twitter',
+          post_content: message,
+          post_url: postResult.url || null,
+          post_id: postResult.tweet_id || null,
+          status: 'posted',
+          posted_at: new Date().toISOString(),
+        });
+      }
+
+      return postResult;
+    } catch (error) {
+      console.error('Error posting to Twitter with image:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Send threat SMS
    */
   async sendThreatSMS(user, snoozeCount, context = {}) {
@@ -258,10 +274,54 @@ export class EscalationService {
       );
 
       const smsResult = await this.twilio.sendSMS(user.phone_number, message);
-
       return smsResult;
     } catch (error) {
       console.error('Error sending threat SMS:', error);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Send text to mom at snooze 4
+   */
+  async sendTextToMom(user, snoozeCount, context = {}) {
+    try {
+      if (!user.mom_phone_number) {
+        return {
+          success: false,
+          error: 'Mom\'s phone number not configured',
+        };
+      }
+
+      // Format phone number (add +1 if not present)
+      let momPhone = user.mom_phone_number;
+      if (!momPhone.startsWith('+')) {
+        momPhone = `+1${momPhone}`;
+      }
+
+      // Message: "degenerate is not waking up"
+      const message = `degenerate is not waking up`;
+
+      const smsResult = await this.twilio.sendSMS(momPhone, message);
+
+      if (smsResult.success) {
+        // Record in database
+        await this.db.recordSocialMediaPost(user.user_id, {
+          snooze_count: snoozeCount,
+          post_type: 'sms',
+          post_content: message,
+          post_id: smsResult.message_sid || null,
+          status: 'posted',
+          posted_at: new Date().toISOString(),
+        });
+      }
+
+      return smsResult;
+    } catch (error) {
+      console.error('Error sending text to mom:', error);
       return {
         success: false,
         error: error.message,

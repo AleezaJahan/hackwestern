@@ -122,20 +122,161 @@ export function getAudioUrl(filename: string): string {
 }
 
 /**
+ * Get random image from camera roll automatically
+ * Prompts user to select a folder containing photos, then randomly picks one
+ */
+export async function getRandomImageFromCameraRoll(): Promise<File | null> {
+  try {
+    // Method 1: Try File System Access API (Chrome/Edge) - allows folder selection
+    if ('showDirectoryPicker' in window) {
+      try {
+        const directoryHandle = await (window as any).showDirectoryPicker({
+          mode: 'read',
+        });
+        
+        // Get all image files from the directory recursively
+        const imageFiles: File[] = [];
+        
+        async function scanDirectory(handle: any) {
+          for await (const entry of handle.values()) {
+            if (entry.kind === 'file') {
+              const file = await entry.getFile();
+              if (file.type.startsWith('image/')) {
+                imageFiles.push(file);
+              }
+            } else if (entry.kind === 'directory') {
+              // Recursively scan subdirectories
+              await scanDirectory(entry);
+            }
+          }
+        }
+        
+        await scanDirectory(directoryHandle);
+        
+        // Return a random image
+        if (imageFiles.length > 0) {
+          const randomIndex = Math.floor(Math.random() * imageFiles.length);
+          console.log(`Found ${imageFiles.length} images, selected random image #${randomIndex + 1}`);
+          return imageFiles[randomIndex];
+        } else {
+          console.warn('No images found in selected directory');
+          return null;
+        }
+      } catch (error: any) {
+        // User cancelled or error occurred
+        if (error.name !== 'AbortError') {
+          console.log('File System Access API error:', error);
+        }
+        // Fall through to fallback method
+      }
+    }
+    
+    // Method 2: Fallback - Use file input with directory selection (webkitdirectory)
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.multiple = true; // Allow multiple files
+      input.webkitdirectory = true; // Allow directory selection
+      input.directory = true; // Alternative attribute
+      input.style.display = 'none';
+      
+      input.onchange = async (e: any) => {
+        const files = Array.from(e.target.files || []) as File[];
+        const imageFiles = files.filter(file => file.type.startsWith('image/'));
+        
+        if (imageFiles.length > 0) {
+          // Select a random image
+          const randomIndex = Math.floor(Math.random() * imageFiles.length);
+          console.log(`Found ${imageFiles.length} images, selected random image #${randomIndex + 1}`);
+          document.body.removeChild(input);
+          resolve(imageFiles[randomIndex]);
+        } else {
+          console.warn('No images found in selected folder');
+          document.body.removeChild(input);
+          resolve(null);
+        }
+      };
+      
+      // Handle cancellation
+      const handleBlur = () => {
+        setTimeout(() => {
+          if (document.body.contains(input) && (!input.files || input.files.length === 0)) {
+            document.body.removeChild(input);
+            window.removeEventListener('blur', handleBlur);
+            resolve(null);
+          }
+        }, 100);
+      };
+      
+      window.addEventListener('blur', handleBlur);
+      
+      // Add to DOM and trigger file picker
+      document.body.appendChild(input);
+      input.click();
+      
+      // Timeout after 60 seconds
+      setTimeout(() => {
+        if (document.body.contains(input)) {
+          document.body.removeChild(input);
+          window.removeEventListener('blur', handleBlur);
+          resolve(null);
+        }
+      }, 60000);
+    });
+  } catch (error) {
+    console.error('Error accessing camera roll:', error);
+    return null;
+  }
+}
+
+/**
  * Send snooze event to social media backend
  */
 export async function notifySocialBackend(
   userId: string,
   snoozeCount: number,
-  wakeUpTime: string
+  wakeUpTime: string,
+  imageData?: File | null,
+  momPhoneNumber?: string
 ): Promise<any> {
   try {
-    const response = await socialApi.post('/snooze/event', {
+    const basePayload: any = {
       user_id: userId,
       snooze_count: snoozeCount,
       wake_up_time: wakeUpTime,
-    });
-    return response.data;
+    };
+
+    // Include mom's phone number if provided
+    if (momPhoneNumber) {
+      basePayload.mom_phone_number = momPhoneNumber;
+    }
+
+    // If snooze 5, we need to send image data
+    if (snoozeCount >= 5 && imageData) {
+      // Convert image to base64 for sending
+      const base64Image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Remove data URL prefix
+          const base64 = result.split(',')[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(imageData);
+      });
+
+      const response = await socialApi.post('/snooze/event', {
+        ...basePayload,
+        image_data: base64Image,
+        image_type: imageData.type,
+      });
+      return response.data;
+    } else {
+      const response = await socialApi.post('/snooze/event', basePayload);
+      return response.data;
+    }
   } catch (error) {
     console.error('Error notifying social backend:', error);
     return { success: false, error: (error as any).message };
