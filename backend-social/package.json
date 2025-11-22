@@ -1,0 +1,22 @@
+{
+  "name": "passive-aggressive-alarm-social-backend",
+  "version": "1.0.0",
+  "description": "Backend & Social Media Chaos - Person 4's backend for social media threats and database management",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "start": "wrangler dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "cloudflare-workers",
+    "social-media",
+    "alarm-clock"
+  ],
+  "author": "Carmen + paridhi",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.114.15"
+  }
+}

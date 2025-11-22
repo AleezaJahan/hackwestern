@@ -1,0 +1,21 @@
+# ElevenLabs API Configuration
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+ELEVENLABS_VOICE_ID=your_voice_id_here
+
+# Google Gemini API Configuration
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# VAPI Configuration
+VAPI_API_KEY=your_vapi_api_key_here
+VAPI_ASSISTANT_ID=your_vapi_assistant_id_here
+
+# Backend API Configuration
+BACKEND_URL=http://localhost:8000
+# Person 4: Social Media Backend (Cloudflare Workers)
+# Note: PERSON3_BACKEND_URL is deprecated but still supported for backward compatibility
+PERSON4_BACKEND_URL=http://localhost:8787
+# PERSON3_BACKEND_URL=http://localhost:8001  # Old name, use PERSON4_BACKEND_URL instead
+
+# Server Configuration
+PORT=8000
+

@@ -1,0 +1,27 @@
+name = "passive-aggressive-alarm-social-backend"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Environment variables (set via Cloudflare dashboard or wrangler secret put)
+# [vars]
+# Optional: Workers KV namespace for persistent storage (create with: wrangler kv:namespace create "DB_KV")
+# If not set, uses in-memory storage (resets on restart - fine for hackathon demo!)
+# DB_KV = "your_kv_namespace_id"
+# TWITTER_BEARER_TOKEN = "your_twitter_bearer_token"
+# TWITTER_API_KEY = "your_twitter_api_key"
+# TWITTER_API_SECRET = "your_twitter_api_secret"
+# TWITTER_ACCESS_TOKEN = "your_twitter_access_token"
+# TWITTER_ACCESS_TOKEN_SECRET = "your_twitter_access_token_secret"
+# TWILIO_ACCOUNT_SID = "your_twilio_account_sid"
+# TWILIO_AUTH_TOKEN = "your_twilio_auth_token"
+# TWILIO_PHONE_NUMBER = "your_twilio_phone_number"
+# OPENROUTER_API_KEY = "your_openrouter_api_key"
+# PERSON1_BACKEND_URL = "http://localhost:8000"
+# PERSON2_BACKEND_URL = "http://localhost:8000"
+
+[env.production]
+name = "passive-aggressive-alarm-social-backend-prod"
+
+[env.staging]
+name = "passive-aggressive-alarm-social-backend-staging"
+
