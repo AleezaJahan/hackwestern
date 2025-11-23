@@ -30,34 +30,53 @@ class GeminiService:
         """
         user_history_str = ", ".join(user_history) if user_history else "None"
         
-        # Build sentiment context if available
+        # Build detailed sentiment context for personalized roasts
         sentiment_context = ""
         if sentiment_analysis:
             sentiment = sentiment_analysis.get("sentiment", "neutral")
             sincerity = sentiment_analysis.get("sincerity_score", 0.5)
             emotions = sentiment_analysis.get("emotions", [])
             is_legitimate = sentiment_analysis.get("is_legitimate_emotional", False)
+            excuse_category = sentiment_analysis.get("excuse_category", "laziness")
+            personality_traits = sentiment_analysis.get("personality_traits", [])
+            specific_details = sentiment_analysis.get("specific_details", [])
+            tone = sentiment_analysis.get("tone", "casual")
+            explanation = sentiment_analysis.get("explanation", "")
             
             if is_legitimate:
                 # This is a legitimate emotional excuse - be empathetic
                 sentiment_context = f"""
-Sentiment Analysis:
-- This is a LEGITIMATE EMOTIONAL EXCUSE (e.g., breakup, loss, health issue, family problem)
+DETAILED Sentiment Analysis:
+- This is a LEGITIMATE EMOTIONAL EXCUSE (category: {excuse_category})
 - Detected sentiment: {sentiment}
 - Emotions detected: {', '.join(emotions)}
 - Sincerity score: {sincerity:.2f} (genuine emotional distress)
+- Tone: {tone}
+- Specific details from excuse: {', '.join(specific_details) if specific_details else 'None'}
+- Context: {explanation}
 - RESPONSE STYLE: Be EMPATHETIC, SUPPORTIVE, and ENCOURAGING. Acknowledge their pain but still motivate them to wake up.
+- Personalize your response using the specific details: {', '.join(specific_details) if specific_details else 'their emotional state'}
 - Say things like "I'm sorry that happened" or "That must be really hard" but then encourage them that they're strong and can get through this.
 """
             else:
-                # This is a lazy/insincere excuse - be mean
+                # This is a lazy/insincere excuse - be mean and PERSONALIZED
                 sentiment_context = f"""
-Sentiment Analysis:
+DETAILED Sentiment Analysis for PERSONALIZED MEAN RESPONSE:
+- Excuse category: {excuse_category}
 - Detected sentiment: {sentiment}
-- Sincerity score: {sincerity:.2f} (0 = lazy/insincere, 1 = genuine)
+- Sincerity score: {sincerity:.2f} (0 = lazy/insincere, 1 = genuine) - LOW = BE MEAN
 - Emotions detected: {', '.join(emotions)}
+- Personality traits revealed: {', '.join(personality_traits)}
+- Tone of delivery: {tone}
+- Specific details from excuse: {', '.join(specific_details) if specific_details else 'None'}
+- Context: {explanation}
 - The excuse sounds {'genuine' if sincerity > 0.6 else 'insincere/lying/lazy'}
-- RESPONSE STYLE: Be MEAN and call them out on their laziness
+- RESPONSE STYLE: Be MEAN, BRUTAL, and PERSONALLY TARGETED. Use the specific details from their excuse to make it personal.
+- Call them out on their {excuse_category} excuse specifically
+- Reference their personality traits: {', '.join(personality_traits)}
+- Use their exact words/phrases from the excuse to make it personal and mean
+- Make fun of their {tone} tone
+- Be creative and use the specific details to craft a personalized, mean roast
 """
         
         # Determine response style based on whether it's legitimate emotional excuse
@@ -106,9 +125,11 @@ Tasks:
 
 IMPORTANT: 
 - Your response MUST match the style: {meanness}
+- PERSONALIZE your response using the specific details from their excuse: {', '.join(sentiment_analysis.get('specific_details', [])) if sentiment_analysis else 'their excuse'}
 - If this is a LEGITIMATE EMOTIONAL EXCUSE (breakup, loss, etc.): Be empathetic, supportive, say "I'm sorry that happened" or "That must be really hard", acknowledge their pain, but still encourage them that they're strong and can get through this. You're better than them, you can do this, etc.
-- If this is a LAZY/INSINCERE excuse: Be mean and call them out
+- If this is a LAZY/INSINCERE excuse: Be MEAN and PERSONALLY TARGETED. Use their exact words, reference their excuse category ({sentiment_analysis.get('excuse_category', 'laziness') if sentiment_analysis else 'laziness'}), call out their personality traits ({', '.join(sentiment_analysis.get('personality_traits', [])) if sentiment_analysis else 'weakness'}), and make it personal
 - Higher snooze count = more direct response (but still empathetic if legitimate)
+- Make the roast SPECIFIC to their excuse - don't be generic!
 
 Response format (JSON):
 {{
@@ -254,31 +275,52 @@ Response format (JSON):
         # Add excuse context if provided
         excuse_text = f'\n\nUser\'s excuse: "{excuse}"' if excuse else '\n\nThe user provided no excuse (which is even worse).'
         
-        # Add sentiment context
+        # Add detailed sentiment context for personalized roasts
         sentiment_context = ""
         if sentiment_analysis:
             is_legitimate = sentiment_analysis.get("is_legitimate_emotional", False)
             sentiment = sentiment_analysis.get("sentiment", "neutral")
             sincerity = sentiment_analysis.get("sincerity_score", 0.5)
             emotions = sentiment_analysis.get("emotions", [])
+            excuse_category = sentiment_analysis.get("excuse_category", "laziness")
+            personality_traits = sentiment_analysis.get("personality_traits", [])
+            specific_details = sentiment_analysis.get("specific_details", [])
+            tone = sentiment_analysis.get("tone", "casual")
             
             if is_legitimate:
                 # Legitimate emotional excuse - be empathetic
-                sentiment_context = f'\n\nCRITICAL: This is a LEGITIMATE EMOTIONAL EXCUSE (breakup, loss, health issue, etc.). Emotions detected: {", ".join(emotions)}. Be EMPATHETIC and SUPPORTIVE. Say "I\'m sorry that happened" or "That must be really hard". Acknowledge their pain but encourage them that they\'re strong and can get through this. You\'re better than them, you can do this, etc.'
+                details_text = ', '.join(specific_details) if specific_details else 'their emotional state'
+                sentiment_context = f'\n\nCRITICAL: This is a LEGITIMATE EMOTIONAL EXCUSE (category: {excuse_category}). Emotions: {", ".join(emotions)}. Tone: {tone}. Specific details: {details_text}. Be EMPATHETIC and SUPPORTIVE. Say "I\'m sorry that happened" or "That must be really hard". Acknowledge their pain but encourage them that they\'re strong and can get through this. Personalize using: {details_text}'
             elif sincerity < 0.5:
-                # Lazy/insincere excuse - be mean
-                sentiment_context = f'\n\nCRITICAL: Sentiment analysis shows they are LYING or INSINCERE (sincerity: {sincerity:.2f}). Their excuse "{excuse}" is FAKE/LAZY. Be EXTRA MEAN and call them out on their dishonesty/laziness. Make it clear you know they\'re just making excuses.'
+                # Lazy/insincere excuse - be mean and PERSONALIZED
+                details_text = ', '.join(specific_details) if specific_details else 'their weak excuse'
+                traits_text = ', '.join(personality_traits) if personality_traits else 'their weakness'
+                sentiment_context = f'\n\nCRITICAL: Sentiment analysis shows they are LYING or INSINCERE (sincerity: {sincerity:.2f}). Excuse category: {excuse_category}. Personality traits: {traits_text}. Tone: {tone}. Specific details from excuse: {details_text}. Their excuse "{excuse}" is FAKE/LAZY. Be EXTRA MEAN and PERSONALLY TARGETED. Use their exact words/phrases: {details_text}. Call them out on being {excuse_category} and having {traits_text}. Make fun of their {tone} tone. Make it PERSONAL and MEAN using the specific details from their excuse.'
             elif sentiment == "negative":
-                sentiment_context = f'\n\nSentiment analysis shows negative emotions: {", ".join(emotions)}. They sound frustrated or annoyed (but not from legitimate emotional distress). Use this to be even more condescending and mean.'
+                details_text = ', '.join(specific_details) if specific_details else 'their excuse'
+                sentiment_context = f'\n\nSentiment analysis shows negative emotions: {", ".join(emotions)}. Excuse category: {excuse_category}. Specific details: {details_text}. They sound frustrated or annoyed (but not from legitimate emotional distress). Use this to be even more condescending and mean. Reference their {excuse_category} excuse and use: {details_text}'
         
-        prompt = f"""{base_prompt}{excuse_text}{sentiment_context}
+        # Build personalized context from sentiment analysis
+        personalization_context = ""
+        if sentiment_analysis:
+            specific_details = sentiment_analysis.get("specific_details", [])
+            excuse_category = sentiment_analysis.get("excuse_category", "")
+            personality_traits = sentiment_analysis.get("personality_traits", [])
+            tone = sentiment_analysis.get("tone", "")
+            
+            if specific_details:
+                personalization_context = f'\n\nPERSONALIZATION REQUIRED:\n- Use these specific details from their excuse: {", ".join(specific_details)}\n- Reference their excuse category: {excuse_category}\n- Call out their personality traits: {", ".join(personality_traits)}\n- Make fun of their {tone} tone\n- Quote or reference their exact words: "{excuse}"\n- Make it PERSONAL and MEAN - don\'t be generic!\n'
+        
+        prompt = f"""{base_prompt}{excuse_text}{sentiment_context}{personalization_context}
 
 Generate a response that:
 - Is 1-2 sentences max
 - If this is a LEGITIMATE EMOTIONAL EXCUSE: Be empathetic, supportive, say "I'm sorry that happened", acknowledge their pain, but encourage them they're strong and can get through this
-- If this is a LAZY/INSINCERE excuse: Be mean, judgmental, and call them out
+- If this is a LAZY/INSINCERE excuse: Be MEAN, BRUTAL, and PERSONALLY TARGETED using their specific excuse details
+- MUST be personalized to their exact excuse - use their words, reference their situation, call out their specific excuse type
 - Escalates in directness based on snooze count ({snooze_count}) - but still empathetic if legitimate
 - Still has personality and humor (empathetic humor if legitimate, dark humor if lazy)
+- Make it PERSONAL - don't give a generic response!
 
 Return ONLY the roast text, no JSON, no quotes."""
         

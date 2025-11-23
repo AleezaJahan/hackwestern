@@ -8,12 +8,14 @@ export class TwilioService {
     this.accountSid = env.TWILIO_ACCOUNT_SID;
     this.authToken = env.TWILIO_AUTH_TOKEN;
     this.phoneNumber = env.TWILIO_PHONE_NUMBER;
+    this.messagingServiceSid = env.TWILIO_MESSAGING_SERVICE_SID; // Optional: Messaging Service SID
     
     // Twilio API endpoint
     this.apiUrl = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
     
-    // Check if credentials are available
-    this.isConfigured = !!(this.accountSid && this.authToken && this.phoneNumber);
+    // Check if credentials are available (either phone number or messaging service)
+    // Priority: Use phone number if available, otherwise use messaging service
+    this.isConfigured = !!(this.accountSid && this.authToken && (this.phoneNumber || this.messagingServiceSid));
   }
 
   /**
@@ -37,7 +39,16 @@ export class TwilioService {
       
       // Prepare form data
       const formData = new URLSearchParams();
-      formData.append('From', this.phoneNumber);
+      
+      // Priority: Use phone number if available, otherwise use messaging service
+      if (this.phoneNumber) {
+        formData.append('From', this.phoneNumber);
+      } else if (this.messagingServiceSid) {
+        formData.append('MessagingServiceSid', this.messagingServiceSid);
+      } else {
+        throw new Error('Neither phone number nor messaging service SID configured');
+      }
+      
       formData.append('To', to);
       formData.append('Body', message);
 

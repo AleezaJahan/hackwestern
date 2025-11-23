@@ -10,6 +10,7 @@ import AlarmSound from '@/components/AlarmSound'
 import RoastDisplay from '@/components/RoastDisplay'
 import SnoozeCounter from '@/components/SnoozeCounter'
 import SocialMediaThreat from '@/components/SocialMediaThreat'
+import CrushTextCountdown from '@/components/CrushTextCountdown'
 import { toast } from 'react-hot-toast'
 import { getNextThreshold } from '@/lib/utils'
 
@@ -24,6 +25,7 @@ export default function Home() {
   const [excuse, setExcuse] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [wakeUpTime, setWakeUpTime] = useState<Date | null>(null)
+  const [showCrushCountdown, setShowCrushCountdown] = useState(false)
   const excuseInputRef = useRef<HTMLInputElement>(null)
   const audioPlayerRef = useRef<AudioPlayerRef>(null)
   const settings = getSettings()
@@ -117,8 +119,14 @@ export default function Home() {
         }
       }
       
-      if (newSnoozeCount >= 3) {
-        await notifySocialBackend(userId, newSnoozeCount, now, imageData, settings.mom_phone_number)
+      // For snooze 3, wait for audio to finish before showing countdown
+      if (newSnoozeCount === 3 && settings.crush_phone_number) {
+        // Don't show countdown yet - wait for audio to finish
+        // The AudioPlayer's onEnded callback will trigger the countdown
+        toast.error('💕 After this message, texting your crush!', { duration: 3000 })
+      } else if (newSnoozeCount > 3) {
+        // Already sent at snooze 3, just notify backend for other actions
+        await notifySocialBackend(userId, newSnoozeCount, now, imageData, settings.crush_phone_number)
       }
 
       // Check if threshold reached
@@ -184,6 +192,23 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 p-4 md:p-8">
+      {/* Crush Text Countdown Overlay */}
+      <CrushTextCountdown
+        isActive={showCrushCountdown}
+        crushPhoneNumber={settings.crush_phone_number}
+        onCountdownComplete={async () => {
+          setShowCrushCountdown(false)
+          // Send the text after countdown
+          const now = new Date().toISOString()
+          await notifySocialBackend(userId, 3, now, null, settings.crush_phone_number)
+          toast.error('💕 Text sent to your crush!', { duration: 3000 })
+        }}
+        onCancel={() => {
+          setShowCrushCountdown(false)
+          toast.warning('Too late! Text already being sent...', { duration: 2000 })
+        }}
+      />
+      
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="text-center mb-8">
@@ -265,7 +290,17 @@ export default function Home() {
             {/* Audio Player - plays voice message */}
             {audioUrl && (
               <div className="mb-6">
-                <AudioPlayer ref={audioPlayerRef} audioUrl={audioUrl} autoPlay />
+                <AudioPlayer 
+                  ref={audioPlayerRef} 
+                  audioUrl={audioUrl} 
+                  autoPlay 
+                  onEnded={() => {
+                    // After audio finishes, show countdown if it's snooze 3
+                    if (snoozeCount === 3 && settings.crush_phone_number && !showCrushCountdown) {
+                      setShowCrushCountdown(true)
+                    }
+                  }}
+                />
               </div>
             )}
 
@@ -290,13 +325,22 @@ export default function Home() {
               />
             </div>
 
+            {/* Warning before snooze 3 */}
+            {snoozeCount === 2 && settings.crush_phone_number && (
+              <div className="mb-4 p-4 bg-red-200 border-2 border-red-500 rounded-lg animate-pulse">
+                <p className="text-red-800 font-bold text-lg text-center">
+                  ⚠️ WARNING: Next snooze will text your crush! 💕
+                </p>
+              </div>
+            )}
+
             {/* Snooze Button */}
             <button
               onClick={handleSnoozeClick}
               disabled={isLoading}
               className="w-full py-4 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-bold text-xl shake"
             >
-              {isLoading ? 'Processing...' : '😴 SNOOZE (I dare you!)'}
+              {isLoading ? 'Processing...' : snoozeCount === 2 && settings.crush_phone_number ? '😴 SNOOZE (Will text crush!)' : '😴 SNOOZE (I dare you!)'}
             </button>
 
             {/* Stop Alarm Button */}

@@ -13,9 +13,9 @@ export class EscalationService {
     
     // Escalation thresholds - Updated per requirements
     this.thresholds = {
-      insults: 3,          // Snoozes 1-3: insults (handled by Person 2 backend)
-      textMom: 4,          // Snooze 4: Send text to mom
-      postToTwitter: 5,    // Snooze 5: Post embarrassing stats on Twitter with image
+      insults: 2,          // Snoozes 1-2: insults (handled by Person 2 backend)
+      textMom: 3,          // Snooze 3: Send text to mom
+      postToTwitter: 5,   // Snooze 5: Post embarrassing stats on Twitter with image
       nuclear: 10,         // Nuclear option at 10 snoozes (if needed)
     };
   }
@@ -52,23 +52,38 @@ export class EscalationService {
       // Get user info
       const user = await this.db.getOrCreateUser(userId);
 
-      // Check text mom threshold (snooze 4)
-      if (snoozeCount >= this.thresholds.textMom && user.mom_phone_number) {
-        const momSMSResult = await this.sendTextToMom(user, snoozeCount, context);
-        actions.push({
-          type: 'text_mom',
-          threshold: this.thresholds.textMom,
-          result: momSMSResult,
-        });
-        actionTaken = true;
+      // Check text crush threshold (snooze 3)
+      if (snoozeCount >= this.thresholds.textMom) {
+        if (!user.crush_phone_number) {
+          console.warn(`⚠️ Snooze ${snoozeCount} reached text crush threshold, but crush_phone_number not set for user ${userId}`);
+          actions.push({
+            type: 'text_crush',
+            threshold: this.thresholds.textMom,
+            result: {
+              success: false,
+              error: 'Crush\'s phone number not configured',
+              message: 'Cannot send text to crush - phone number not set in settings'
+            },
+          });
+        } else {
+          console.log(`💕 Sending text to crush at snooze ${snoozeCount} for user ${userId}`);
+          const crushSMSResult = await this.sendTextToCrush(user, snoozeCount, context);
+          console.log(`💕 Text to crush result:`, crushSMSResult);
+          actions.push({
+            type: 'text_crush',
+            threshold: this.thresholds.textMom,
+            result: crushSMSResult,
+          });
+          actionTaken = true;
 
-        // Record escalation trigger
-        await this.db.recordEscalationTrigger(userId, {
-          snooze_threshold: this.thresholds.textMom,
-          action_type: 'text_mom',
-          executed: momSMSResult.success,
-          execution_result: momSMSResult,
-        });
+          // Record escalation trigger
+          await this.db.recordEscalationTrigger(userId, {
+            snooze_threshold: this.thresholds.textMom,
+            action_type: 'text_crush',
+            executed: crushSMSResult.success,
+            execution_result: crushSMSResult,
+          });
+        }
       }
 
       // Check Twitter post threshold (snooze 5) - Post embarrassing stats with image
@@ -285,27 +300,40 @@ export class EscalationService {
   }
 
   /**
-   * Send text to mom at snooze 4
+   * Send text to crush at snooze 3
    */
-  async sendTextToMom(user, snoozeCount, context = {}) {
+  async sendTextToCrush(user, snoozeCount, context = {}) {
     try {
-      if (!user.mom_phone_number) {
+      if (!user.crush_phone_number) {
+        console.error('❌ Crush\'s phone number not configured for user:', user.user_id);
         return {
           success: false,
-          error: 'Mom\'s phone number not configured',
+          error: 'Crush\'s phone number not configured',
         };
       }
 
       // Format phone number (add +1 if not present)
-      let momPhone = user.mom_phone_number;
-      if (!momPhone.startsWith('+')) {
-        momPhone = `+1${momPhone}`;
+      let crushPhone = user.crush_phone_number;
+      if (!crushPhone.startsWith('+')) {
+        // Remove any non-digit characters first
+        crushPhone = crushPhone.replace(/\D/g, '');
+        // Add +1 if it's a 10-digit US number
+        if (crushPhone.length === 10) {
+          crushPhone = `+1${crushPhone}`;
+        } else if (crushPhone.length === 11 && crushPhone.startsWith('1')) {
+          crushPhone = `+${crushPhone}`;
+        } else {
+          // Assume it's already in correct format or add +1
+          crushPhone = `+1${crushPhone}`;
+        }
       }
 
-      // Message: "degenerate is not waking up"
-      const message = `degenerate is not waking up`;
+      // Romantic message for crush
+      const message = `Hey babe, I was up all night thinking about how to confess my feelings for you, and now I can't wake up. Call me please.`;
 
-      const smsResult = await this.twilio.sendSMS(momPhone, message);
+      console.log(`💕 Attempting to send SMS to ${crushPhone} with message: "${message}"`);
+      const smsResult = await this.twilio.sendSMS(crushPhone, message);
+      console.log(`💕 SMS send result:`, smsResult);
 
       if (smsResult.success) {
         // Record in database

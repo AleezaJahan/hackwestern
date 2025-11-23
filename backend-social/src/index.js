@@ -142,11 +142,12 @@ async function handleSnoozeEvent(request, db, escalation, integration) {
   }
 
   try {
-    // Get or create user with mom_phone_number
+    // Get or create user with crush_phone_number
     const user = await db.getOrCreateUser(body.user_id, {
       email: body.email || null,
       phone_number: body.phone_number || null,
       mom_phone_number: body.mom_phone_number || null,
+      crush_phone_number: body.crush_phone_number || null,
       twitter_handle: body.twitter_handle || null,
     });
 
@@ -179,12 +180,22 @@ async function handleSnoozeEvent(request, db, escalation, integration) {
       context.imageData = blob;
     }
 
+    // Log for debugging
+    console.log(`🔔 Snooze event received:`, {
+      user_id: body.user_id,
+      snooze_count: body.snooze_count,
+      crush_phone_number: body.crush_phone_number || 'NOT PROVIDED',
+      user_crush_phone: user.crush_phone_number || 'NOT SET IN DB'
+    });
+
     // Check escalation thresholds and trigger actions
     const escalationResult = await escalation.checkAndTrigger(
       body.user_id,
       body.snooze_count,
       context
     );
+    
+    console.log(`🔔 Escalation result:`, JSON.stringify(escalationResult, null, 2));
 
     // Get user's embarrassing stats
     const stats = await db.getEmbarrassingStats(body.user_id);

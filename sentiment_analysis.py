@@ -29,30 +29,43 @@ class SentimentAnalyzer:
             - emotions (list of detected emotions)
             - sincerity_score (0-1, how genuine the excuse sounds)
         """
-        prompt = f"""Analyze the sentiment and sincerity of the following sleep excuse transcription.
+        prompt = f"""Analyze the sentiment and sincerity of the following sleep excuse transcription in EXTREME DETAIL.
 
 Transcribed text: "{transcribed_text}"
 
-IMPORTANT: Distinguish between:
-- LEGITIMATE emotional excuses (breakups, family issues, health problems, grief) → High sincerity, genuine emotions
-- LAZY/INSINCERE excuses (just tired, don't want to, "5 more minutes") → Low sincerity, no real emotion
+IMPORTANT: Provide DEEP sentiment analysis to enable personalized, mean responses.
+
+Analyze:
+1. **Emotional State**: What is the person REALLY feeling? (desperate, lazy, manipulative, genuine, etc.)
+2. **Excuse Type**: Categorize the excuse (breakup, health, laziness, manipulation, etc.)
+3. **Personality Traits Revealed**: What does this excuse reveal about them? (weak-willed, dramatic, attention-seeking, etc.)
+4. **Specific Details**: Extract specific details from the excuse that can be used for personalization
+5. **Tone Analysis**: How are they saying it? (whiny, casual, dramatic, etc.)
 
 Provide a detailed sentiment analysis including:
 1. Sentiment (positive/negative/neutral)
 2. Confidence score (0-1)
-3. Detected emotions (list of 2-3 main emotions - e.g., sad, heartbroken, depressed, anxious, or lazy, tired, unmotivated)
-4. Sincerity score (0-1, where 0 is lazy/insincere and 1 is genuinely sincere/legitimate emotional reason)
-5. Is this a legitimate emotional excuse? (true/false) - e.g., breakup, loss, health issue, family problem
-6. Brief explanation (1 sentence)
+3. Detected emotions (list of 3-5 specific emotions with context)
+4. Sincerity score (0-1, where 0 is lazy/insincere and 1 is genuinely sincere)
+5. Is this a legitimate emotional excuse? (true/false)
+6. Excuse category (breakup, health, laziness, manipulation, drama, etc.)
+7. Personality traits revealed (list 2-3 traits)
+8. Specific details to personalize response (extract key phrases, situations, etc.)
+9. Tone of delivery (whiny, casual, dramatic, desperate, etc.)
+10. Brief explanation (2-3 sentences with context)
 
 Respond in JSON format:
 {{
     "sentiment": "<positive|negative|neutral>",
     "confidence": <0.0-1.0>,
-    "emotions": ["<emotion1>", "<emotion2>"],
+    "emotions": ["<emotion1>", "<emotion2>", "<emotion3>"],
     "sincerity_score": <0.0-1.0>,
     "is_legitimate_emotional": <true|false>,
-    "explanation": "<brief explanation>"
+    "excuse_category": "<breakup|health|laziness|manipulation|drama|other>",
+    "personality_traits": ["<trait1>", "<trait2>"],
+    "specific_details": ["<detail1>", "<detail2>"],
+    "tone": "<whiny|casual|dramatic|desperate|lazy|other>",
+    "explanation": "<detailed 2-3 sentence explanation with context>"
 }}"""
         
         try:
@@ -83,6 +96,14 @@ Respond in JSON format:
                 emotions = result.get("emotions", [])
                 legitimate_emotions = ["sad", "heartbroken", "depressed", "anxious", "grief", "hurt", "devastated", "upset"]
                 result["is_legitimate_emotional"] = any(emotion.lower() in legitimate_emotions for emotion in emotions) or result.get("sincerity_score", 0) > 0.7
+            if "excuse_category" not in result:
+                result["excuse_category"] = "laziness"
+            if "personality_traits" not in result:
+                result["personality_traits"] = ["weak-willed", "unmotivated"]
+            if "specific_details" not in result:
+                result["specific_details"] = []
+            if "tone" not in result:
+                result["tone"] = "casual"
             if "explanation" not in result:
                 result["explanation"] = "Sounds like a typical excuse."
                 
@@ -97,6 +118,10 @@ Respond in JSON format:
                 "emotions": ["tired", "reluctant"],
                 "sincerity_score": 0.2,  # Assume low sincerity
                 "is_legitimate_emotional": False,
+                "excuse_category": "laziness",
+                "personality_traits": ["weak-willed", "unmotivated"],
+                "specific_details": [],
+                "tone": "casual",
                 "explanation": "Could not analyze sentiment properly."
             }
     

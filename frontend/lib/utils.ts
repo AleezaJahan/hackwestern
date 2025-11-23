@@ -119,7 +119,7 @@ export function getNextThreshold(snoozeCount: number): {
   snoozesUntil: number;
   message: string;
 } | null {
-  const thresholds = [3, 5, 7, 10];
+  const thresholds = [3, 5];
   const next = thresholds.find((t) => snoozeCount < t);
   
   if (!next) {
@@ -136,13 +136,9 @@ export function getNextThreshold(snoozeCount: number): {
 function getThresholdMessage(threshold: number): string {
   switch (threshold) {
     case 3:
-      return 'Next: SMS threat at 3 snoozes';
+      return 'Next: Text to crush at 3 snoozes';
     case 5:
-      return 'Next: Social media threat at 5 snoozes';
-    case 7:
-      return 'Next: Twitter post at 7 snoozes';
-    case 10:
-      return 'Next: Nuclear option at 10 snoozes';
+      return 'Next: Twitter post with photo at 5 snoozes';
     default:
       return 'All thresholds passed!';
   }

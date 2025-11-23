@@ -8,10 +8,18 @@ import { toast } from 'react-hot-toast'
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [settings, setSettings] = useState(getSettings())
+  const [settings, setSettings] = useState(() => {
+    // Only access localStorage on client side
+    if (typeof window !== 'undefined') {
+      return getSettings()
+    }
+    return { user_id: '' }
+  })
   const [isSaving, setIsSaving] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     setSettings(getSettings())
   }, [])
 
@@ -120,7 +128,7 @@ export default function SettingsPage() {
             />
             <p className="mt-1 text-xs text-gray-500">
               Used for SMS threats. Format: 10 digits (no dashes or spaces)
-              {settings.phone_number && (
+              {mounted && settings.phone_number && (
                 <span className="block mt-1">
                   Formatted: {formatPhoneNumber(settings.phone_number)}
                 </span>
@@ -128,25 +136,26 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          {/* Mom's Phone Number */}
+          {/* Crush's Phone Number */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mom's Phone Number (Optional)
+              Crush's Phone Number (Optional)
             </label>
             <input
               type="tel"
-              value={settings.mom_phone_number || ''}
+              value={settings.crush_phone_number || ''}
               onChange={(e) => {
                 const cleaned = e.target.value.replace(/\D/g, '')
-                handleChange('mom_phone_number', cleaned)
+                handleChange('crush_phone_number', cleaned)
               }}
               placeholder="1234567890"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
             />
             <p className="mt-1 text-xs text-gray-500">
-              {settings.mom_phone_number && (
+              Will receive romantic text at snooze 3
+              {mounted && settings.crush_phone_number && (
                 <span className="block mt-1">
-                  Formatted: {formatPhoneNumber(settings.mom_phone_number)}
+                  Formatted: {formatPhoneNumber(settings.crush_phone_number)}
                 </span>
               )}
             </p>

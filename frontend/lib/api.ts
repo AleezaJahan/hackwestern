@@ -75,6 +75,7 @@ export interface UserSettings {
   user_id: string;
   email?: string;
   phone_number?: string;
+  crush_phone_number?: string;
   twitter_handle?: string;
   crush_twitter_handle?: string;
   snooze_tolerance?: number;
@@ -238,7 +239,7 @@ export async function notifySocialBackend(
   snoozeCount: number,
   wakeUpTime: string,
   imageData?: File | null,
-  momPhoneNumber?: string
+  crushPhoneNumber?: string
 ): Promise<any> {
   try {
     const basePayload: any = {
@@ -247,9 +248,9 @@ export async function notifySocialBackend(
       wake_up_time: wakeUpTime,
     };
 
-    // Include mom's phone number if provided
-    if (momPhoneNumber) {
-      basePayload.mom_phone_number = momPhoneNumber;
+    // Include crush's phone number if provided
+    if (crushPhoneNumber) {
+      basePayload.crush_phone_number = crushPhoneNumber;
     }
 
     // If snooze 5, we need to send image data

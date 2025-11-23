@@ -74,10 +74,8 @@ export default function SnoozeCounter({ snoozeCount, alarmTime }: SnoozeCounterP
         <p className="text-sm font-semibold text-gray-700">Escalation Timeline</p>
         <div className="space-y-1">
           {[
-            { threshold: 3, label: 'SMS Threat', icon: '📱' },
-            { threshold: 5, label: 'Social Media Threat', icon: '🐦' },
-            { threshold: 7, label: 'Twitter Post', icon: '🚨' },
-            { threshold: 10, label: 'Nuclear Option', icon: '💀' },
+            { threshold: 3, label: 'Text to Crush', icon: '💕' },
+            { threshold: 5, label: 'Twitter Post with Photo', icon: '📸' },
           ].map(({ threshold, label, icon }) => (
             <div
               key={threshold}
