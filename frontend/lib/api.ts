@@ -278,31 +278,9 @@ export async function notifySocialBackend(
       basePayload.crush_phone_number = crushPhoneNumber;
     }
 
-    // If snooze 5, we need to send image data
-    if (snoozeCount >= 5 && imageData) {
-      // Convert image to base64 for sending
-      const base64Image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // Remove data URL prefix
-          const base64 = result.split(',')[1];
-          resolve(base64);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(imageData);
-      });
-
-      const response = await socialApi.post('/snooze/event', {
-        ...basePayload,
-        image_data: base64Image,
-        image_type: imageData.type,
-      });
-      return response.data;
-    } else {
-      const response = await socialApi.post('/snooze/event', basePayload);
-      return response.data;
-    }
+    // Post to Twitter at snooze 5 (text only, no image)
+    const response = await socialApi.post('/snooze/event', basePayload);
+    return response.data;
   } catch (error) {
     console.error('Error notifying social backend:', error);
     return { success: false, error: (error as any).message };

@@ -162,23 +162,11 @@ async function handleSnoozeEvent(request, db, escalation, integration) {
       sentiment: body.sentiment || null,
     });
 
-    // Prepare context with image data if provided (for snooze 5)
+    // Prepare context (no image data needed - text only)
     const context = {
       excuse: body.excuse,
       snoozeRecord,
     };
-
-    // If image data is provided (base64), convert it to a format Twitter can use
-    if (body.image_data && body.image_type) {
-      // Convert base64 to Blob for Twitter API
-      const binaryString = atob(body.image_data);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      const blob = new Blob([bytes], { type: body.image_type });
-      context.imageData = blob;
-    }
 
     // Log for debugging
     console.log(`🔔 Snooze event received:`, {

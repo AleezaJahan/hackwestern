@@ -101,32 +101,14 @@ export default function Home() {
       setAudioUrl(response.audio_url)
       setExcuse('')
       
-      // Notify Person 4's backend (Social Media)
-      let imageData: File | null = null;
-      if (newSnoozeCount >= 5) {
-        // At snooze 5, automatically get random image from camera roll
-        try {
-          const { getRandomImageFromCameraRoll } = await import('@/lib/api');
-          imageData = await getRandomImageFromCameraRoll();
-          if (imageData) {
-            toast.success('📸 Random image selected from camera roll!');
-          } else {
-            toast.warning('⚠️ No image found, posting stats without image');
-          }
-        } catch (error) {
-          console.error('Error getting image:', error);
-          toast.warning('⚠️ Could not access camera roll, posting without image');
-        }
-      }
-      
       // For snooze 3, wait for audio to finish before showing countdown
       if (newSnoozeCount === 3 && settings.crush_phone_number) {
         // Don't show countdown yet - wait for audio to finish
         // The AudioPlayer's onEnded callback will trigger the countdown
         toast.error('💕 After this message, texting your crush!', { duration: 3000 })
       } else if (newSnoozeCount > 3) {
-        // Already sent at snooze 3, just notify backend for other actions
-        await notifySocialBackend(userId, newSnoozeCount, now, imageData, settings.crush_phone_number)
+        // Already sent at snooze 3, just notify backend for other actions (no image)
+        await notifySocialBackend(userId, newSnoozeCount, now, null, settings.crush_phone_number)
       }
 
       // Check if threshold reached
@@ -181,6 +163,7 @@ export default function Home() {
     setCurrentRoast(undefined)
     setCurrentAnalysis(undefined)
     setExcuse('')
+    setShowCrushCountdown(false) // Reset countdown state
     
     // Reset alarm time so user can set a new one
     setAlarmTime('')
@@ -269,8 +252,8 @@ export default function Home() {
                   Alarm set for: {formatDateTime(new Date(alarmTime))}
                 </p>
                 <p className="text-sm text-gray-600">
-                  Alarm will go off in {getMinutesUntilAlarm(alarmTime)} minutes
-                </p>
+                Alarm will go off in {getMinutesUntilAlarm(alarmTime)} minutes
+              </p>
               </div>
             )}
           </div>

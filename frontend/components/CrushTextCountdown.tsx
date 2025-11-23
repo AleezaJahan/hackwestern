@@ -18,25 +18,54 @@ export default function CrushTextCountdown({
 }: CrushTextCountdownProps) {
   const [countdown, setCountdown] = useState(5)
   const audioRefs = useRef<HTMLAudioElement[]>([])
+  const isPlayingRef = useRef(false)
+  const sequenceRef = useRef<Promise<void> | null>(null)
+
+  // Stop all currently playing audio
+  const stopAllAudio = () => {
+    audioRefs.current.forEach(audio => {
+      audio.pause()
+      audio.currentTime = 0
+      audio.onended = null
+      audio.onerror = null
+    })
+    audioRefs.current = []
+  }
 
   // Play countdown audio using ElevenLabs
   const playCountdownAudio = async (text: string): Promise<void> => {
+    // Stop any currently playing audio first
+    stopAllAudio()
+    
     try {
       const audioUrl = await generateCountdownAudio(text)
       const audio = new Audio(audioUrl)
       
       return new Promise((resolve, reject) => {
+        // Clean up function
+        const cleanup = () => {
+          URL.revokeObjectURL(audioUrl)
+          const index = audioRefs.current.indexOf(audio)
+          if (index > -1) {
+            audioRefs.current.splice(index, 1)
+          }
+        }
+        
         audio.onended = () => {
-          URL.revokeObjectURL(audioUrl) // Clean up
+          cleanup()
           resolve()
         }
         audio.onerror = (e) => {
           console.error('Error playing countdown audio:', e)
-          URL.revokeObjectURL(audioUrl) // Clean up
+          cleanup()
           reject(e)
         }
-        audio.play().catch(reject)
+        
         audioRefs.current.push(audio)
+        audio.play().catch((err) => {
+          cleanup()
+          reject(err)
+        })
       })
     } catch (error) {
       console.error('Error generating/playing countdown audio:', error)
@@ -48,17 +77,24 @@ export default function CrushTextCountdown({
   useEffect(() => {
     if (!isActive) {
       setCountdown(5)
-      // Stop all audio
-      audioRefs.current.forEach(audio => {
-        audio.pause()
-        audio.currentTime = 0
-      })
-      audioRefs.current = []
+      isPlayingRef.current = false
+      stopAllAudio()
+      // Cancel any ongoing sequence
+      if (sequenceRef.current) {
+        sequenceRef.current = null
+      }
+      return
+    }
+
+    // Prevent multiple simultaneous countdowns
+    if (isPlayingRef.current) {
+      console.warn('Countdown already playing, ignoring duplicate trigger')
       return
     }
 
     // Reset countdown when component becomes active
     setCountdown(5)
+    isPlayingRef.current = true
 
     // Play countdown audio sequentially using ElevenLabs
     const playCountdownSequence = async () => {
@@ -98,10 +134,14 @@ export default function CrushTextCountdown({
         // Play "now wake up"
         await playCountdownAudio("now wake up")
         
+        // Reset flag
+        isPlayingRef.current = false
+        
         // Call completion handler
         onCountdownComplete()
       } catch (error) {
         console.error('Error in countdown sequence:', error)
+        isPlayingRef.current = false
         // Still call completion even if audio fails
         onCountdownComplete()
       }
@@ -109,17 +149,15 @@ export default function CrushTextCountdown({
 
     // Small delay to ensure component is mounted
     const startDelay = setTimeout(() => {
-      playCountdownSequence()
+      sequenceRef.current = playCountdownSequence()
     }, 200)
 
     return () => {
       clearTimeout(startDelay)
-      // Stop all audio on cleanup
-      audioRefs.current.forEach(audio => {
-        audio.pause()
-        audio.currentTime = 0
-      })
-      audioRefs.current = []
+      isPlayingRef.current = false
+      stopAllAudio()
+      // Cancel any ongoing sequence
+      sequenceRef.current = null
     }
   }, [isActive, onCountdownComplete])
 

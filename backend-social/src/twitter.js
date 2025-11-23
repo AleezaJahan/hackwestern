@@ -14,37 +14,90 @@ export class TwitterService {
     // Twitter API v2 endpoint
     this.apiUrl = 'https://api.twitter.com/2';
     
-    // Check if credentials are available - Bearer Token alone is sufficient for API v2
-    this.isConfigured = !!(this.bearerToken || (this.accessToken && this.accessTokenSecret && this.apiKey && this.apiSecret));
+    // Check if credentials are available
+    // For posting tweets, we need OAuth 1.0a (API Key, Secret, Access Token, Access Token Secret)
+    // Bearer Token alone is NOT sufficient for posting (read-only)
+    this.hasOAuth1 = !!(this.apiKey && this.apiSecret && this.accessToken && this.accessTokenSecret);
+    this.isConfigured = !!(this.hasOAuth1 || this.bearerToken);
+    
+    // Debug logging
+    console.log('🐦 TwitterService initialized:');
+    console.log('🐦 OAuth 1.0a credentials present:', this.hasOAuth1);
+    console.log('🐦 Bearer Token present:', !!this.bearerToken);
+    console.log('🐦 Can post tweets:', this.hasOAuth1);
+    console.log('🐦 Is configured:', this.isConfigured);
   }
 
   /**
    * Generate OAuth 1.0a signature for Twitter API
-   * Simple implementation - for production, use a library like oauth-1.0a
+   * Uses Web Crypto API (compatible with Cloudflare Workers)
    */
   async generateOAuthSignature(method, url, params = {}) {
-    // Note: For production, use a proper OAuth library
-    // This is a simplified version for demonstration
-    // You should use a library like 'oauth-1.0a' or implement proper HMAC-SHA1
-    
-    // Use Web Crypto API (compatible with Cloudflare Workers)
+    if (!this.apiKey || !this.apiSecret || !this.accessToken || !this.accessTokenSecret) {
+      return null;
+    }
+
+    // Generate nonce
     const array = new Uint8Array(16);
     crypto.getRandomValues(array);
     const nonce = Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-    
-    const oauth = {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+
+    // Build parameter string
+    const oauthParams = {
       oauth_consumer_key: this.apiKey,
       oauth_token: this.accessToken,
       oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: Math.floor(Date.now() / 1000),
+      oauth_timestamp: timestamp,
       oauth_nonce: nonce,
       oauth_version: '1.0',
       ...params,
     };
 
-    // For now, we'll use Bearer token (simpler for API v2)
-    // If you need OAuth 1.0a, use a proper library
-    return null;
+    // Sort and encode parameters
+    const sortedParams = Object.keys(oauthParams)
+      .sort()
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(oauthParams[key])}`)
+      .join('&');
+
+    // Create signature base string
+    const signatureBaseString = [
+      method.toUpperCase(),
+      encodeURIComponent(url),
+      encodeURIComponent(sortedParams)
+    ].join('&');
+
+    // Create signing key
+    const signingKey = `${encodeURIComponent(this.apiSecret)}&${encodeURIComponent(this.accessTokenSecret)}`;
+
+    // Generate HMAC-SHA1 signature
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(signingKey);
+    const messageData = encoder.encode(signatureBaseString);
+    
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-1' },
+      false,
+      ['sign']
+    );
+    
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
+    const signatureBase64 = btoa(String.fromCharCode(...new Uint8Array(signature)));
+
+    // Build OAuth header
+    const oauthHeader = [
+      `oauth_consumer_key="${encodeURIComponent(this.apiKey)}"`,
+      `oauth_token="${encodeURIComponent(this.accessToken)}"`,
+      `oauth_signature_method="HMAC-SHA1"`,
+      `oauth_timestamp="${timestamp}"`,
+      `oauth_nonce="${nonce}"`,
+      `oauth_version="1.0"`,
+      `oauth_signature="${encodeURIComponent(signatureBase64)}"`
+    ].join(', ');
+
+    return `OAuth ${oauthHeader}`;
   }
 
   /**
@@ -64,6 +117,8 @@ export class TwitterService {
     }
 
     try {
+      console.log('🐦 Attempting to post tweet:', text);
+      
       // Twitter API v2 endpoint for creating tweets
       const endpoint = `${this.apiUrl}/tweets`;
       
@@ -71,21 +126,65 @@ export class TwitterService {
         text: text,
       };
 
+      console.log('🐦 Posting to:', endpoint);
+      console.log('🐦 Payload:', JSON.stringify(payload));
+
+      // Try OAuth 1.0a first (required for posting)
+      let authHeader = null;
+      console.log('🐦 Checking credentials:');
+      console.log('🐦 API Key:', this.apiKey ? 'PRESENT' : 'MISSING');
+      console.log('🐦 API Secret:', this.apiSecret ? 'PRESENT' : 'MISSING');
+      console.log('🐦 Access Token:', this.accessToken ? 'PRESENT' : 'MISSING');
+      console.log('🐦 Access Token Secret:', this.accessTokenSecret ? 'PRESENT' : 'MISSING');
+      
+      if (this.apiKey && this.apiSecret && this.accessToken && this.accessTokenSecret) {
+        console.log('🐦 Using OAuth 1.0a authentication');
+        authHeader = await this.generateOAuthSignature('POST', endpoint);
+        console.log('🐦 OAuth header generated:', authHeader ? 'YES' : 'NO');
+        if (authHeader) {
+          console.log('🐦 OAuth header preview:', authHeader.substring(0, 50) + '...');
+        }
+      } else {
+        console.log('🐦 OAuth 1.0a credentials incomplete, falling back to Bearer Token');
+        if (this.bearerToken) {
+          console.log('🐦 Using Bearer Token (will NOT work for posting)');
+          authHeader = `Bearer ${this.bearerToken}`;
+        } else {
+          throw new Error('No Twitter credentials configured. Need OAuth 1.0a credentials to post tweets.');
+        }
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (authHeader) {
+        headers['Authorization'] = authHeader;
+      }
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.bearerToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: JSON.stringify(payload),
       });
 
+      console.log('🐦 Response status:', response.status);
+      console.log('🐦 Response ok:', response.ok);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Twitter API error: ${error.detail || response.statusText}`);
+        const errorText = await response.text();
+        console.error('🐦 Twitter API error response:', errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { detail: errorText };
+        }
+        throw new Error(`Twitter API error: ${error.detail || error.title || response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('🐦 Tweet posted successfully:', data);
 
       return {
         success: true,
@@ -94,7 +193,7 @@ export class TwitterService {
         message: 'Tweet posted successfully',
       };
     } catch (error) {
-      console.error('Error posting tweet:', error);
+      console.error('🐦 Error posting tweet:', error);
       return {
         success: false,
         error: error.message,
@@ -166,7 +265,13 @@ export class TwitterService {
         payload.media = {
           media_ids: [mediaId],
         };
+        console.log('🐦 Posting tweet with media_id:', mediaId);
+      } else {
+        console.log('🐦 Posting tweet without image (image upload may have failed)');
       }
+
+      console.log('🐦 Posting to:', endpoint);
+      console.log('🐦 Payload:', JSON.stringify(payload));
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -177,12 +282,23 @@ export class TwitterService {
         body: JSON.stringify(payload),
       });
 
+      console.log('🐦 Response status:', response.status);
+      console.log('🐦 Response ok:', response.ok);
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Twitter API error: ${error.detail || response.statusText}`);
+        const errorText = await response.text();
+        console.error('🐦 Twitter API error response:', errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { detail: errorText };
+        }
+        throw new Error(`Twitter API error: ${error.detail || error.title || response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('🐦 Tweet with image posted successfully:', data);
 
       return {
         success: true,
@@ -191,7 +307,8 @@ export class TwitterService {
         message: 'Tweet with image posted successfully',
       };
     } catch (error) {
-      console.error('Error posting tweet with image:', error);
+      console.error('🐦 Error posting tweet with image:', error);
+      console.log('🐦 Falling back to posting without image...');
       // Fallback to posting without image
       return await this.postTweet(text, userId);
     }

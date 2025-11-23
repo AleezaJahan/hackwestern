@@ -86,9 +86,12 @@ export class EscalationService {
         }
       }
 
-      // Check Twitter post threshold (snooze 5) - Post embarrassing stats with image
+      // Check Twitter post threshold (snooze 5) - Post text only
       if (snoozeCount >= this.thresholds.postToTwitter) {
+        console.log(`🐦 Snooze ${snoozeCount} reached Twitter threshold (${this.thresholds.postToTwitter})`);
+        console.log(`🐦 Calling postToTwitterWithImage for user ${userId}`);
         const postResult = await this.postToTwitterWithImage(user, snoozeCount, context);
+        console.log(`🐦 Twitter post result:`, JSON.stringify(postResult, null, 2));
         actions.push({
           type: 'twitter_post',
           threshold: this.thresholds.postToTwitter,
@@ -221,30 +224,21 @@ export class EscalationService {
   }
 
   /**
-   * Post to Twitter with image at snooze 5
+   * Post to Twitter at snooze 5 (text only, no image)
    */
   async postToTwitterWithImage(user, snoozeCount, context = {}) {
     try {
-      const stats = await this.db.getEmbarrassingStats(user.user_id);
-      const wakeUpTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      // Simple message: "eat, sleep, repeat"
+      const message = "eat, sleep, repeat";
+      
+      console.log(`🐦 Snooze ${snoozeCount}: Posting to Twitter for user ${user.user_id}`);
+      console.log(`🐦 Twitter handle from settings: ${user.twitter_handle || 'NOT SET'}`);
+      console.log(`🐦 Message: "${message}"`);
 
-      // Generate embarrassing stats message
-      let message;
-      if (stats) {
-        message = `📊 SNOOZE STATS OF THE DAY 📊\n\n${user.twitter_handle ? `@${user.twitter_handle} ` : ''}Today's wake-up performance:\n• Total snoozes: ${stats.total_snoozes}\n• Longest snooze session: ${stats.longest_snooze_session}\n• Most common excuse: "${stats.most_common_excuse || 'None recorded'}"\n\nImpressive. Very impressive. 🏆\n\n#SnoozeStats #SleepGoals #NotReally`;
-      } else {
-        message = this.twitter.generateThreatMessage(
-          snoozeCount,
-          wakeUpTime,
-          user.twitter_handle || null
-        );
-      }
-
-      // Get image from context (sent from frontend)
-      const imageData = context.imageData || null;
-
-      // Post to Twitter with image
-      const postResult = await this.twitter.postTweetWithImage(message, imageData, user.user_id);
+      // Post to Twitter (text only, no image)
+      const postResult = await this.twitter.postTweet(message, user.user_id);
+      
+      console.log(`🐦 Twitter post result:`, postResult);
 
       if (postResult.success) {
         // Record in database
