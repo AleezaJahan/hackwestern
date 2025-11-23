@@ -8,6 +8,7 @@ venv/
 ENV/
 .venv
 .env
+.env.bak
 *.log
 .DS_Store
 *.wav
@@ -16,4 +17,5 @@ ENV/
 audio_output/
 temp/
 .dev.vars
+TWILIO_SETUP_COMPLETE.md
 
