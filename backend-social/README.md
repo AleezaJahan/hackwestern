@@ -1,20 +1,55 @@
-# Backend & Social Media Chaos ⚙️
+# 🌙 Rise & Roast - Backend & Social Media Chaos ⚙️
 
-**Person 4: Backend & Social Media Integration**
+**Social Media & Escalation Backend**
 
-This Cloudflare Worker handles serverless logic, database operations, Twitter/X API integration, escalation logic, and SMS threats via Twilio.
+This Cloudflare Worker handles serverless logic, Twitter/X API integration, SMS threats via Twilio, escalation logic, and all the social media chaos that makes Rise & Roast so effective at getting you out of bed.
 
-## Features
+## ✨ Cool Features
 
-- ✅ **Cloudflare Workers** for serverless logic
-- ✅ **Simple JSON Storage** (no external database required!) - Perfect for hackathons
-  - Uses in-memory storage by default (resets on restart)
-  - Optional: Workers KV for persistence (one command to set up)
-- ✅ **Twitter/X API Integration** for posting threats and embarrassing stats
-- ✅ **Escalation Logic** (snooze thresholds → action triggers)
-- ✅ **Authentication & User Data Management**
-- ✅ **SMS Threats via Twilio** for extra chaos
-- ✅ **Integration** with Person 1 and Person 2 backends
+### 🐦 **Twitter/X Integration**
+- **OAuth 1.0a Authentication**: Full Twitter API v1.1 integration for posting tweets
+- **Bearer Token Support**: Alternative authentication method
+- **Rate Limit Handling**: Smart rate limit detection and error handling
+- **Unique Tweet Generation**: Automatically adds timestamps to prevent duplicate content errors
+- **Embarrassing Posts**: Posts "eat, sleep, repeat" with timestamp when you snooze 5+ times
+- **Post Tracking**: Records all Twitter posts in storage for history
+
+### 💬 **SMS Threats via Twilio**
+- **Twilio SMS Integration**: Send threatening SMS messages to your phone
+- **Crush Text Feature**: Send embarrassing romantic texts to your crush at snooze 3
+  - **Two Separate Messages**: 
+    1. Romantic text: "Hey babe, I was up all night thinking about how to confess my feelings for you, and now I can't wake up. Call me please."
+    2. Random emojis: 8 random emojis from a huge collection (farm animals, faces, hands, hearts, food, etc.)
+- **Phone Number Formatting**: Automatic E.164 format conversion
+- **MMS Support**: Infrastructure for sending images (currently using emojis)
+- **Message Tracking**: Records all SMS messages in storage
+
+### 📊 **Escalation System**
+- **Progressive Threat Levels**: 
+  - **3 snoozes**: Text your crush with romantic message + 8 random emojis
+  - **5 snoozes**: Post embarrassing tweet to Twitter/X
+- **Countdown Integration**: Works with frontend countdown popups
+- **Smart Thresholds**: Configurable escalation points
+- **Action Logging**: Tracks all escalation actions
+
+### 💾 **Simple Storage System**
+- **No Database Required**: Perfect for hackathons!
+- **In-Memory Storage**: Works out of the box (resets on restart)
+- **Optional Workers KV**: One command to enable persistence
+- **JSON-Based**: Simple, hackathon-friendly data structure
+- **Storage Includes**:
+  - User profiles and settings
+  - Snooze history
+  - Social media posts
+  - SMS messages
+  - Escalation triggers
+  - Embarrassing stats
+
+### 🔗 **API Integration**
+- **RESTful Endpoints**: Clean API for frontend and other backends
+- **Health Checks**: Service status monitoring
+- **Error Handling**: Comprehensive error responses
+- **CORS Support**: Cross-origin requests enabled
 
 ## Architecture
 
@@ -23,9 +58,11 @@ Alarm triggers → ElevenLabs generates snarky voice message
     ↓
 User hits snooze → Gemini API analyzes excuse + generates roast
     ↓
-Multiple snoozes → Cloudflare Worker triggers social media threat
+3 snoozes → Countdown warning → Text crush with romantic message + 8 emojis
     ↓
-Final snooze → Actually posts embarrassing wake-up stats
+5 snoozes → Countdown warning → Post embarrassing tweet to Twitter/X
+    ↓
+Sleep session ends → Stats saved for tracking
 ```
 
 ## Setup
@@ -54,41 +91,46 @@ wrangler kv:namespace create "DB_KV"
 # DB_KV = "your_namespace_id"
 ```
 
-### 2. Configure Environment Variables (Optional)
+### 3. Configure Environment Variables
 
-Only needed if you want Twitter/SMS features:
+Create a `.dev.vars` file for local development:
 
 ```bash
-# Twitter/X API (optional - uses mock responses if not set)
-wrangler secret put TWITTER_BEARER_TOKEN
-wrangler secret put TWITTER_API_KEY
-wrangler secret put TWITTER_API_SECRET
-wrangler secret put TWITTER_ACCESS_TOKEN
-wrangler secret put TWITTER_ACCESS_TOKEN_SECRET
-
-# Twitter/X API (for posting threats)
-wrangler secret put TWITTER_API_KEY
-wrangler secret put TWITTER_API_SECRET
-wrangler secret put TWITTER_ACCESS_TOKEN
-wrangler secret put TWITTER_ACCESS_TOKEN_SECRET
-wrangler secret put TWITTER_BEARER_TOKEN
+# Twitter/X API (OAuth 1.0a)
+TWITTER_API_KEY=your_twitter_api_key
+TWITTER_API_SECRET=your_twitter_api_secret
+TWITTER_ACCESS_TOKEN=your_twitter_access_token
+TWITTER_ACCESS_TOKEN_SECRET=your_twitter_access_token_secret
+TWITTER_BEARER_TOKEN=your_twitter_bearer_token
 
 # Twilio (for SMS threats)
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=+1234567890
+TWILIO_MESSAGING_SERVICE_SID=your_messaging_service_sid  # Optional
+
+# Integration URLs
+PERSON1_BACKEND_URL=http://localhost:3000
+PERSON2_BACKEND_URL=http://localhost:8000
+```
+
+For production, use Wrangler secrets:
+
+```bash
+# Twitter/X API
+wrangler secret put TWITTER_API_KEY
+wrangler secret put TWITTER_API_SECRET
+wrangler secret put TWITTER_ACCESS_TOKEN
+wrangler secret put TWITTER_ACCESS_TOKEN_SECRET
+wrangler secret put TWITTER_BEARER_TOKEN
+
+# Twilio
 wrangler secret put TWILIO_ACCOUNT_SID
 wrangler secret put TWILIO_AUTH_TOKEN
 wrangler secret put TWILIO_PHONE_NUMBER
-
-# Integration URLs
-wrangler secret put PERSON1_BACKEND_URL
-wrangler secret put PERSON2_BACKEND_URL
-
-# Optional: OpenRouter (fallback AI)
-wrangler secret put OPENROUTER_API_KEY
 ```
 
-Or update `wrangler.toml` directly with your values (not recommended for secrets).
-
-### 3. No Database Setup Needed! 🎉
+### 4. No Database Setup Needed! 🎉
 
 **That's it!** The simple JSON storage works out of the box.
 
@@ -99,12 +141,18 @@ Or update `wrangler.toml` directly with your values (not recommended for secrets
 
 Data is stored in memory (or Workers KV if configured).
 
-### 4. Deploy
+### 5. Run Locally
 
 ```bash
 # Development
 npm run dev
 
+# The worker will start at http://localhost:8787
+```
+
+### 6. Deploy
+
+```bash
 # Production
 npm run deploy
 ```
@@ -119,7 +167,7 @@ GET /health
 
 Returns service status and health information.
 
-### Snooze Event (from Person 1)
+### Snooze Event (from Frontend)
 
 ```http
 POST /snooze/event
@@ -128,48 +176,20 @@ Content-Type: application/json
 {
   "user_id": "user123",
   "snooze_count": 3,
-  "excuse": "Just 5 more minutes",
-  "transcribed_excuse": "just five more minutes",
-  "alarm_time": "2024-01-01T08:00:00Z",
   "wake_up_time": "2024-01-01T08:15:00Z",
-  "sentiment": { "score": 0.2, "label": "negative" },
-  "legitimacy_score": 15.5
+  "crush_phone_number": "+19056166269",
+  "settings": {
+    "twitter_handle": "your_handle",
+    "phone_number": "+1234567890",
+    "enable_social_media_threats": true,
+    "enable_sms_threats": true
+  }
 }
 ```
 
 Records a snooze event and triggers escalation logic based on thresholds.
 
-### Snooze Count Notification
-
-```http
-POST /snooze/count
-Content-Type: application/json
-
-{
-  "user_id": "user123",
-  "snooze_count": 5,
-  "wake_up_time": "2024-01-01T08:15:00Z"
-}
-```
-
-Checks if social media threat should be triggered.
-
-### Force Escalation
-
-```http
-POST /escalate
-Content-Type: application/json
-
-{
-  "user_id": "user123",
-  "snooze_count": 7,
-  "action_type": "twitter_post"  // or "sms", "twitter_threat", "nuclear", "auto"
-}
-```
-
-Forces escalation to a specific action.
-
-### Post to Twitter
+### Post to Twitter/X
 
 ```http
 POST /social/twitter/post
@@ -183,7 +203,7 @@ Content-Type: application/json
 }
 ```
 
-Executes a Twitter post and records it in the database.
+Executes a Twitter post and records it in storage. The message is automatically formatted as "eat, sleep, repeat" with timestamp.
 
 ### Send SMS Threat
 
@@ -199,6 +219,23 @@ Content-Type: application/json
 ```
 
 Sends an SMS threat via Twilio.
+
+### Send Text to Crush
+
+```http
+POST /social/crush/text
+Content-Type: application/json
+
+{
+  "user_id": "user123",
+  "snooze_count": 3,
+  "crush_phone_number": "+19056166269"
+}
+```
+
+Sends two separate SMS messages to the crush:
+1. Romantic text message
+2. 8 random emojis
 
 ### Get User Stats
 
@@ -224,32 +261,63 @@ GET /user/history?user_id=user123&limit=10
 
 Returns snooze history for a user.
 
+### Debug Export
+
+```http
+GET /debug/export
+```
+
+Exports all data (useful for debugging).
+
 ## Escalation Thresholds
 
 The system uses the following thresholds:
 
-- **3 snoozes**: Send SMS threat
-- **5 snoozes**: Generate social media threat (but don't post yet)
-- **7 snoozes**: Actually post to Twitter
-- **10 snoozes**: Nuclear option - Post embarrassing stats
+- **3 snoozes**: 
+  - Send SMS threat to user's phone (if enabled)
+  - **Text crush** with romantic message + 8 random emojis (if crush phone number is set)
+- **5 snoozes**: 
+  - **Post embarrassing tweet** to Twitter/X ("eat, sleep, repeat" with timestamp)
+  - Generate social media threat (if not already posted)
 
 These thresholds can be customized in `src/escalation.js`.
 
-## Integration Points
+## Twitter/X Integration Details
 
-### Person 1 (Alarm Trigger Backend)
+### Message Format
+- **Default Message**: "eat, sleep, repeat" with timestamp
+- **Timestamp Format**: "MMM DD at HH:MM:SS AM/PM"
+- **Unique Content**: Each tweet includes timestamp to prevent duplicate content errors
 
-Person 1 should send snooze events to:
-```
-POST /snooze/event
-```
+### Authentication Methods
+1. **OAuth 1.0a** (Primary): Full Twitter API v1.1 support
+2. **Bearer Token** (Fallback): For read-only operations
 
-### Person 2 (AI & Voice Integration)
+### Rate Limits
+- Automatically detects rate limit errors (429)
+- Returns helpful error messages
+- Logs rate limit information for debugging
 
-This backend coordinates with Person 2 on roast intensity by sending:
-```
-POST {PERSON2_BACKEND_URL}/roast/intensity
-```
+## Twilio SMS Integration Details
+
+### Crush Text Feature
+When snooze count reaches 3:
+1. **First SMS**: Romantic text message
+   - Message: "Hey babe, I was up all night thinking about how to confess my feelings for you, and now I can't wake up. Call me please."
+2. **Second SMS**: 8 random emojis
+   - Emojis selected from: farm animals, faces, hands, hearts, food, symbols
+   - Different emojis each time
+
+### Phone Number Formatting
+- Automatically converts to E.164 format
+- Handles 10-digit US numbers (adds +1)
+- Handles 11-digit numbers (adds +)
+- Validates phone number format
+
+### Message Tracking
+- All SMS messages are recorded in storage
+- Includes message SID, status, and timestamp
+- Can be retrieved via `/user/history` endpoint
 
 ## Storage Structure
 
@@ -260,10 +328,30 @@ The simple storage includes the following data structures:
 - **excuse_patterns**: Array of excuse patterns
 - **embarrassing_stats**: Daily stats indexed by user_id-date
 - **social_media_posts**: Array of all social media posts
+  - Includes: post_type, post_content, post_id, status, posted_at
 - **escalation_triggers**: Array of escalation action logs
+- **sms_messages**: Array of all SMS messages sent
 
 **Debug Endpoint:**
 - `GET /debug/export` - Export all data (useful for debugging)
+
+## Integration Points
+
+### Frontend
+The frontend sends snooze events to:
+```
+POST /snooze/event
+```
+
+When thresholds are reached:
+- Snooze 3: Frontend shows countdown → Worker sends crush text
+- Snooze 5: Frontend shows countdown → Worker posts to Twitter
+
+### Python Backend (AI & Voice)
+This backend coordinates with the Python backend:
+- Receives snooze events from frontend
+- Triggers escalation actions
+- Records all actions in storage
 
 ## Development
 
@@ -273,27 +361,73 @@ npm run dev
 
 # Deploy to Cloudflare Workers
 npm run deploy
+
+# Test Twitter posting
+curl -X POST http://localhost:8787/social/twitter/post \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "test-user", "message": "Test tweet", "force": true}'
+
+# Test SMS
+curl -X POST http://localhost:8787/social/crush/text \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "test-user", "snooze_count": 3, "crush_phone_number": "+19056166269"}'
 ```
 
 ## Troubleshooting
 
 ### Twitter API Not Working
 
-- Make sure you have valid Twitter API v2 credentials
-- Check that your Bearer token has the right permissions
-- For OAuth 1.0a, you may need to install additional libraries
+- Make sure you have valid Twitter API v1.1 credentials
+- Check that your OAuth tokens are correct
+- Verify Bearer token has the right permissions
+- Check rate limits (429 errors mean you've hit the limit)
+- Ensure tweet content is unique (adds timestamp automatically)
 
 ### Twilio SMS Not Sending
 
-- Verify your Twilio credentials are correct
+- Verify your Twilio credentials are correct in `.dev.vars`
 - Check that your Twilio phone number is verified
 - Ensure the destination phone number is in E.164 format (+1234567890)
+- Check Twilio console for message logs
+- Verify account has sufficient credits
+
+### Crush Text Not Working
+
+- Ensure `crush_phone_number` is provided in the request
+- Check that phone number is valid and in correct format
+- Verify Twilio credentials are set correctly
+- Check that SMS threats are enabled in user settings
 
 ### Storage Issues
 
 - In-memory storage: Data resets on restart (this is normal!)
 - Workers KV: Verify namespace ID is correct in wrangler.toml
 - Check `/debug/export` endpoint to see current data
+- Ensure storage permissions are set correctly
+
+### Rate Limits
+
+- Twitter: 300 tweets per 3 hours (for new accounts)
+- Twilio: Depends on your account tier
+- Check error responses for rate limit information
+- Wait for rate limit to reset before retrying
+
+## File Structure
+
+```
+backend-social/
+├── src/
+│   ├── index.js           # Main Cloudflare Worker entry point
+│   ├── twitter.js         # Twitter/X API integration
+│   ├── twilio.js          # Twilio SMS/MMS integration
+│   ├── escalation.js      # Escalation logic and thresholds
+│   ├── storage.js         # Simple JSON storage system
+│   └── integration.js     # Integration with other backends
+├── wrangler.toml          # Cloudflare Workers configuration
+├── package.json           # Dependencies
+├── .dev.vars              # Local development environment variables
+└── README.md              # This file
+```
 
 ## License
 
@@ -302,4 +436,3 @@ MIT
 ## Authors
 
 Carmen + paridhi
-
