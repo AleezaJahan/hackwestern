@@ -445,6 +445,49 @@ async def get_vapi_call_status(call_id: str):
         raise HTTPException(status_code=500, detail=f"Error getting call status: {str(e)}")
 
 
+@app.post("/countdown/audio")
+async def generate_countdown_audio(request: Dict[str, Any]):
+    """Generate countdown audio using ElevenLabs.
+    
+    Request body:
+    {
+        "text": "5" or "4" or "3" or "2" or "1" or "Text sent"
+    }
+    """
+    try:
+        text = request.get("text", "")
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+        
+        elevenlabs = get_elevenlabs_service()
+        
+        # Use a consistent voice for countdown (sarcastic friend voice - Bella)
+        # This matches the snooze 3 level voice
+        voice_id = Config.VOICE_SARCASTIC  # Bella voice
+        
+        # Generate audio
+        audio_data = elevenlabs.generate_voice(
+            text=text,
+            voice_id=voice_id,
+            stability=0.5,
+            similarity_boost=0.75,
+            style=0.6,
+            use_speaker_boost=True
+        )
+        
+        # Return base64 encoded audio
+        import base64
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        
+        return JSONResponse(content={
+            "audio_base64": audio_base64,
+            "text": text
+        })
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating countdown audio: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     

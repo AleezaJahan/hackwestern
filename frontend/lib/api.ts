@@ -126,6 +126,31 @@ export function getAudioUrl(filename: string): string {
  * Get random image from camera roll automatically
  * Prompts user to select a folder containing photos, then randomly picks one
  */
+export async function generateCountdownAudio(text: string): Promise<string> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/countdown/audio`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate countdown audio: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    // Convert base64 to blob URL
+    const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0))
+    const blob = new Blob([audioBytes], { type: 'audio/mpeg' })
+    return URL.createObjectURL(blob)
+  } catch (error) {
+    console.error('Error generating countdown audio:', error)
+    throw error
+  }
+}
+
 export async function getRandomImageFromCameraRoll(): Promise<File | null> {
   try {
     // Method 1: Try File System Access API (Chrome/Edge) - allows folder selection

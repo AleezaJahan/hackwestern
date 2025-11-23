@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { generateCountdownAudio } from '@/lib/api'
 
 interface CrushTextCountdownProps {
   isActive: boolean
@@ -16,84 +17,109 @@ export default function CrushTextCountdown({
   onCancel
 }: CrushTextCountdownProps) {
   const [countdown, setCountdown] = useState(5)
-  const speechSynthesisRef = useRef<SpeechSynthesis | null>(null)
+  const audioRefs = useRef<HTMLAudioElement[]>([])
 
-  // Speak the countdown number
-  const speakCountdown = (number: number) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      return
+  // Play countdown audio using ElevenLabs
+  const playCountdownAudio = async (text: string): Promise<void> => {
+    try {
+      const audioUrl = await generateCountdownAudio(text)
+      const audio = new Audio(audioUrl)
+      
+      return new Promise((resolve, reject) => {
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl) // Clean up
+          resolve()
+        }
+        audio.onerror = (e) => {
+          console.error('Error playing countdown audio:', e)
+          URL.revokeObjectURL(audioUrl) // Clean up
+          reject(e)
+        }
+        audio.play().catch(reject)
+        audioRefs.current.push(audio)
+      })
+    } catch (error) {
+      console.error('Error generating/playing countdown audio:', error)
+      // Fallback: continue even if audio fails
+      return Promise.resolve()
     }
-
-    // Cancel any ongoing speech
-    if (speechSynthesisRef.current) {
-      speechSynthesis.cancel()
-    }
-
-    const utterance = new SpeechSynthesisUtterance(number.toString())
-    utterance.rate = 0.9
-    utterance.pitch = 1.2
-    utterance.volume = 1.0
-    
-    speechSynthesis.speak(utterance)
-    speechSynthesisRef.current = speechSynthesis
-  }
-
-  // Speak "text sent"
-  const speakTextSent = () => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      return
-    }
-
-    const utterance = new SpeechSynthesisUtterance('Text sent')
-    utterance.rate = 0.9
-    utterance.pitch = 1.0
-    utterance.volume = 1.0
-    
-    speechSynthesis.speak(utterance)
   }
 
   useEffect(() => {
     if (!isActive) {
       setCountdown(5)
-      // Cancel any ongoing speech
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        speechSynthesis.cancel()
-      }
+      // Stop all audio
+      audioRefs.current.forEach(audio => {
+        audio.pause()
+        audio.currentTime = 0
+      })
+      audioRefs.current = []
       return
     }
 
     // Reset countdown when component becomes active
     setCountdown(5)
 
-    // Speak the initial countdown number (5)
-    speakCountdown(5)
+    // Play countdown audio sequentially using ElevenLabs
+    const playCountdownSequence = async () => {
+      try {
+        // First, play the warning message
+        await playCountdownAudio("I'm going to text your crush in 5 seconds if you don't wake up")
+        
+        // Small pause after warning
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Play "5"
+        await playCountdownAudio("5")
+        setCountdown(4)
+        
+        // Play "4"
+        await playCountdownAudio("4")
+        setCountdown(3)
+        
+        // Play "3"
+        await playCountdownAudio("3")
+        setCountdown(2)
+        
+        // Play "2"
+        await playCountdownAudio("2")
+        setCountdown(1)
+        
+        // Play "1"
+        await playCountdownAudio("1")
+        setCountdown(0)
+        
+        // Play "text sent to crush loser" with dramatic pause before "now wake up"
+        await playCountdownAudio("text sent to crush loser")
+        
+        // Dramatic pause (1.5 seconds)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        
+        // Play "now wake up"
+        await playCountdownAudio("now wake up")
+        
+        // Call completion handler
+        onCountdownComplete()
+      } catch (error) {
+        console.error('Error in countdown sequence:', error)
+        // Still call completion even if audio fails
+        onCountdownComplete()
+      }
+    }
 
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        const newCount = prev - 1
-        if (newCount > 0) {
-          // Speak the countdown number
-          speakCountdown(newCount)
-        } else if (newCount === 0) {
-          // Speak "text sent" when countdown reaches 0
-          speakTextSent()
-          clearInterval(timer)
-          // Small delay before calling onCountdownComplete
-          setTimeout(() => {
-            onCountdownComplete()
-          }, 500)
-          return 0
-        }
-        return newCount
-      })
-    }, 1000)
+    // Small delay to ensure component is mounted
+    const startDelay = setTimeout(() => {
+      playCountdownSequence()
+    }, 200)
 
     return () => {
-      clearInterval(timer)
-      // Cancel speech on cleanup
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        speechSynthesis.cancel()
-      }
+      clearTimeout(startDelay)
+      // Stop all audio on cleanup
+      audioRefs.current.forEach(audio => {
+        audio.pause()
+        audio.currentTime = 0
+      })
+      audioRefs.current = []
     }
   }, [isActive, onCountdownComplete])
 
