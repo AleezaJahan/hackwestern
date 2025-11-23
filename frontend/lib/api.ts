@@ -170,7 +170,7 @@ export async function getRandomImageFromCameraRoll(): Promise<File | null> {
         // Get all image files from the directory recursively
         const imageFiles: File[] = [];
         
-        async function scanDirectory(handle: any) {
+        const scanDirectory = async (handle: any) => {
           for await (const entry of handle.values()) {
             if (entry.kind === 'file') {
               const file = await entry.getFile();
@@ -211,7 +211,6 @@ export async function getRandomImageFromCameraRoll(): Promise<File | null> {
       input.accept = 'image/*';
       input.multiple = true; // Allow multiple files
       input.webkitdirectory = true; // Allow directory selection
-      input.directory = true; // Alternative attribute
       input.style.display = 'none';
       
       input.onchange = async (e: any) => {
