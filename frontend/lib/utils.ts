@@ -79,32 +79,32 @@ export function getSnoozeLevelInfo(snoozeCount: number): {
   if (snoozeCount <= 2) {
     return {
       level: 'Mild',
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-purple-300',
+      bgColor: 'bg-purple-900/40',
       emoji: '😊',
       message: 'You\'re doing okay!',
     };
   } else if (snoozeCount <= 4) {
     return {
       level: 'Moderate',
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
+      color: 'text-purple-400',
+      bgColor: 'bg-purple-800/40',
       emoji: '😐',
       message: 'Getting a bit excessive...',
     };
   } else if (snoozeCount <= 6) {
     return {
       level: 'Aggressive',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-700/40',
       emoji: '😠',
       message: 'This is getting ridiculous!',
     };
   } else {
     return {
       level: 'Nuclear',
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-950/40',
       emoji: '💀',
       message: 'NUCLEAR OPTION ENGAGED!',
     };

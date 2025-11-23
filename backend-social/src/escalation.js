@@ -52,9 +52,33 @@ export class EscalationService {
       // Get user info
       const user = await this.db.getOrCreateUser(userId);
 
-      // Check text crush threshold (snooze 3)
-      if (snoozeCount >= this.thresholds.textMom) {
-        if (!user.crush_phone_number) {
+      // Check text crush threshold (snooze 3) - ONLY send once at exactly snooze 3
+      if (snoozeCount === this.thresholds.textMom) {
+        // Check if we've already sent a text to crush for this alarm session
+        const existingTriggers = await this.db.getEscalationTriggers(userId, {
+          action_type: 'text_crush',
+          snooze_threshold: this.thresholds.textMom,
+        });
+        
+        // Check if we've already sent a text today (prevent duplicates)
+        const today = new Date().toISOString().split('T')[0];
+        const todayTriggers = existingTriggers.filter(trigger => {
+          const triggerDate = new Date(trigger.created_at || trigger.triggered_at || trigger.timestamp || new Date()).toISOString().split('T')[0];
+          return triggerDate === today;
+        });
+        
+        if (todayTriggers.length > 0 && todayTriggers.some(t => t.executed)) {
+          console.log(`💕 Text to crush already sent today for user ${userId}, skipping`);
+          actions.push({
+            type: 'text_crush',
+            threshold: this.thresholds.textMom,
+            result: {
+              success: false,
+              skipped: true,
+              message: 'Text to crush already sent today',
+            },
+          });
+        } else if (!user.crush_phone_number) {
           console.warn(`⚠️ Snooze ${snoozeCount} reached text crush threshold, but crush_phone_number not set for user ${userId}`);
           actions.push({
             type: 'text_crush',
@@ -88,24 +112,37 @@ export class EscalationService {
 
       // Check Twitter post threshold (snooze 5) - Post text only
       if (snoozeCount >= this.thresholds.postToTwitter) {
-        console.log(`🐦 Snooze ${snoozeCount} reached Twitter threshold (${this.thresholds.postToTwitter})`);
-        console.log(`🐦 Calling postToTwitterWithImage for user ${userId}`);
-        const postResult = await this.postToTwitterWithImage(user, snoozeCount, context);
-        console.log(`🐦 Twitter post result:`, JSON.stringify(postResult, null, 2));
-        actions.push({
-          type: 'twitter_post',
-          threshold: this.thresholds.postToTwitter,
-          result: postResult,
-        });
-        actionTaken = true;
+        // Check if social media threats are enabled and user has Twitter handle
+        if (user.enable_social_media_threats !== false && user.twitter_handle) {
+          console.log(`🐦 Snooze ${snoozeCount} reached Twitter threshold (${this.thresholds.postToTwitter})`);
+          console.log(`🐦 Calling postToTwitterWithImage for user ${userId}`);
+          const postResult = await this.postToTwitterWithImage(user, snoozeCount, context);
+          console.log(`🐦 Twitter post result:`, JSON.stringify(postResult, null, 2));
+          actions.push({
+            type: 'twitter_post',
+            threshold: this.thresholds.postToTwitter,
+            result: postResult,
+          });
+          actionTaken = true;
 
-        // Record escalation trigger
-        await this.db.recordEscalationTrigger(userId, {
-          snooze_threshold: this.thresholds.postToTwitter,
-          action_type: 'twitter_post',
-          executed: postResult.success,
-          execution_result: postResult,
-        });
+          // Record escalation trigger
+          await this.db.recordEscalationTrigger(userId, {
+            snooze_threshold: this.thresholds.postToTwitter,
+            action_type: 'twitter_post',
+            executed: postResult.success,
+            execution_result: postResult,
+          });
+        } else {
+          console.warn(`⚠️ Twitter post skipped: enable_social_media_threats=${user.enable_social_media_threats}, twitter_handle=${user.twitter_handle || 'NOT SET'}`);
+          actions.push({
+            type: 'twitter_post',
+            threshold: this.thresholds.postToTwitter,
+            result: {
+              success: false,
+              error: user.enable_social_media_threats === false ? 'Social media threats disabled' : 'Twitter handle not set',
+            },
+          });
+        }
       }
 
       // Check nuclear threshold (post embarrassing stats)
@@ -228,8 +265,9 @@ export class EscalationService {
    */
   async postToTwitterWithImage(user, snoozeCount, context = {}) {
     try {
-      // Simple message: "eat, sleep, repeat"
-      const message = "eat, sleep, repeat";
+      // Generate message with timestamp using the Twitter service
+      const wakeUpTime = context.wakeUpTime || new Date().toISOString();
+      const message = this.twitter.generateThreatMessage(snoozeCount, wakeUpTime, user.twitter_handle);
       
       console.log(`🐦 Snooze ${snoozeCount}: Posting to Twitter for user ${user.user_id}`);
       console.log(`🐦 Twitter handle from settings: ${user.twitter_handle || 'NOT SET'}`);
@@ -325,12 +363,46 @@ export class EscalationService {
       // Romantic message for crush
       const message = `Hey babe, I was up all night thinking about how to confess my feelings for you, and now I can't wake up. Call me please.`;
 
-      console.log(`💕 Attempting to send SMS to ${crushPhone} with message: "${message}"`);
+      // Step 1: Send the text message first
+      console.log(`💕 Step 1: Sending SMS text to ${crushPhone} with message: "${message}"`);
       const smsResult = await this.twilio.sendSMS(crushPhone, message);
       console.log(`💕 SMS send result:`, smsResult);
 
+      // Step 2: Send second SMS with 8 random emojis
+      const allEmojis = [
+        '🐄', '🐷', '🐔', '🐑', '🐐', '🐴', '🦆', '🐓', '🦃', '🐰', '🐮', '🐽', // Farm animals
+        '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', // Happy faces
+        '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', // More faces
+        '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', // Expressions
+        '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', // Sad/angry
+        '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', // More expressions
+        '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', // Thinking
+        '🥴', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', // Sick/sleepy
+        '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', // Special
+        '👽', '👾', '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', // Animals/other
+        '😾', '👋', '🤚', '🖐', '✋', '🖖', '👌', '🤏', '✌️', '🤞', '🤟', '🤘', // Hands
+        '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', // More hands
+        '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪', '🦾', '🦿', '🦵', // Body parts
+        '🦶', '👂', '🦻', '👃', '🧠', '🦷', '🦴', '👀', '👁️', '👅', '👄', '💋', // More body
+        '💘', '💝', '💖', '💗', '💓', '💞', '💕', '💟', '❣️', '💔', '❤️', '🧡', // Hearts
+        '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💯', '💢', '💥', '💫', '💦', // Symbols
+        '💨', '🕳️', '💣', '💬', '👁️‍🗨️', '🗨️', '🗯️', '💭', '💤', '👋', '🤚', '🖐', // More symbols
+      ];
+      
+      // Pick 8 random emojis (can have duplicates)
+      const randomEmojis = [];
+      for (let i = 0; i < 8; i++) {
+        const randomIndex = Math.floor(Math.random() * allEmojis.length);
+        randomEmojis.push(allEmojis[randomIndex]);
+      }
+      const emojiMessage = randomEmojis.join('');
+      
+      console.log(`🐾 Step 2: Sending second SMS with 8 random emojis: ${emojiMessage}`);
+      const emojiSmsResult = await this.twilio.sendSMS(crushPhone, emojiMessage);
+      console.log(`🐾 Emoji SMS send result:`, emojiSmsResult);
+
+      // Record both SMS messages in database if successful
       if (smsResult.success) {
-        // Record in database
         await this.db.recordSocialMediaPost(user.user_id, {
           snooze_count: snoozeCount,
           post_type: 'sms',
@@ -341,7 +413,30 @@ export class EscalationService {
         });
       }
 
-      return smsResult;
+      if (emojiSmsResult && emojiSmsResult.success) {
+        await this.db.recordSocialMediaPost(user.user_id, {
+          snooze_count: snoozeCount,
+          post_type: 'sms',
+          post_content: emojiMessage,
+          post_id: emojiSmsResult.message_sid || null,
+          status: 'posted',
+          posted_at: new Date().toISOString(),
+        });
+      }
+
+      // Return combined result with detailed info
+      const result = {
+        success: smsResult.success && (emojiSmsResult && emojiSmsResult.success),
+        sms_result: smsResult,
+        emoji_sms_result: emojiSmsResult,
+        emojis: emojiMessage,
+        message: smsResult.success 
+          ? (emojiSmsResult && emojiSmsResult.success ? 'Both SMS messages sent successfully' : `First SMS sent, emoji SMS ${emojiSmsResult ? 'failed' : 'not sent'}`)
+          : 'First SMS failed',
+      };
+      
+      console.log(`💕 Final result for crush text:`, JSON.stringify(result, null, 2));
+      return result;
     } catch (error) {
       console.error('Error sending text to mom:', error);
       return {

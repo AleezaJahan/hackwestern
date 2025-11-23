@@ -96,7 +96,7 @@ const AudioPlayer = forwardRef<AudioPlayerRef, AudioPlayerProps>(
             }
           }
         }}
-        className="p-3 bg-primary-600 text-white rounded-full hover:bg-primary-700 transition-colors"
+        className="p-3 bg-purple-700 text-white rounded-full hover:bg-purple-600 transition-colors shadow-lg"
         aria-label={isPlaying ? 'Pause audio' : 'Play audio'}
       >
         {isPlaying ? (

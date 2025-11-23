@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import { getSettings } from './storage';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 const SOCIAL_BACKEND_URL = process.env.NEXT_PUBLIC_SOCIAL_BACKEND_URL || 'http://localhost:8787';
@@ -28,6 +29,7 @@ export interface AlarmTriggerRequest {
   snooze_count: number;
   user_id?: string;
   wake_up_time?: string;
+  language?: string; // Language code (e.g., 'en', 'es', 'fr', etc.)
 }
 
 export interface AlarmTriggerResponse {
@@ -42,6 +44,7 @@ export interface SnoozeRequest {
   snooze_count: number;
   user_id?: string;
   transcribed_audio?: string;
+  language?: string; // Language code (e.g., 'en', 'es', 'fr', etc.)
 }
 
 export interface SnoozeResponse {
@@ -77,8 +80,6 @@ export interface UserSettings {
   phone_number?: string;
   crush_phone_number?: string;
   twitter_handle?: string;
-  crush_twitter_handle?: string;
-  snooze_tolerance?: number;
   enable_social_media_threats?: boolean;
   enable_sms_threats?: boolean;
 }
@@ -126,14 +127,20 @@ export function getAudioUrl(filename: string): string {
  * Get random image from camera roll automatically
  * Prompts user to select a folder containing photos, then randomly picks one
  */
-export async function generateCountdownAudio(text: string): Promise<string> {
+export async function generateCountdownAudio(text: string, language?: string): Promise<string> {
   try {
+    // Get language from settings if not provided
+    if (!language && typeof window !== 'undefined') {
+      const settings = getSettings();
+      language = settings.language || 'en';
+    }
+    
     const response = await fetch(`${BACKEND_URL}/countdown/audio`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, language: language || 'en' }),
     })
 
     if (!response.ok) {
@@ -264,7 +271,13 @@ export async function notifySocialBackend(
   snoozeCount: number,
   wakeUpTime: string,
   imageData?: File | null,
-  crushPhoneNumber?: string
+  crushPhoneNumber?: string,
+  settings?: {
+    twitter_handle?: string;
+    phone_number?: string;
+    enable_social_media_threats?: boolean;
+    enable_sms_threats?: boolean;
+  }
 ): Promise<any> {
   try {
     const basePayload: any = {
@@ -276,6 +289,19 @@ export async function notifySocialBackend(
     // Include crush's phone number if provided
     if (crushPhoneNumber) {
       basePayload.crush_phone_number = crushPhoneNumber;
+    }
+
+    // Include user settings for Twitter and SMS
+    if (settings) {
+      if (settings.twitter_handle) {
+        basePayload.twitter_handle = settings.twitter_handle;
+      }
+      if (settings.phone_number) {
+        basePayload.phone_number = settings.phone_number;
+      }
+      // Include enable flags so backend knows what's allowed
+      basePayload.enable_social_media_threats = settings.enable_social_media_threats !== false;
+      basePayload.enable_sms_threats = settings.enable_sms_threats !== false;
     }
 
     // Post to Twitter at snooze 5 (text only, no image)

@@ -20,7 +20,7 @@ export default function RoastDisplay({ roast, snoozeCount, analysis }: RoastDisp
   }
 
   return (
-    <div className={`w-full p-6 rounded-lg ${levelInfo.bgColor} border-2 border-current ${levelInfo.color} shadow-lg`}>
+    <div className={`w-full p-6 rounded-3xl bg-purple-900/40 backdrop-blur-md border-2 border-purple-300/30 shadow-2xl text-white`}>
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="text-3xl">{levelInfo.emoji}</span>
@@ -35,12 +35,12 @@ export default function RoastDisplay({ roast, snoozeCount, analysis }: RoastDisp
         </div>
       </div>
 
-      <div className="bg-white/50 rounded-lg p-4 mb-4">
-        <p className="text-gray-800 font-medium italic text-lg">{roast}</p>
+      <div className="bg-purple-800/40 backdrop-blur-sm rounded-2xl p-4 mb-4 border border-purple-300/30">
+        <p className="text-white font-medium italic text-lg">{roast}</p>
       </div>
 
       {analysis && (
-        <div className="mt-4 space-y-2 text-sm">
+        <div className="mt-4 space-y-2 text-sm text-white/90">
           {analysis.legitimacy_score !== undefined && (
             <div className="flex items-center justify-between">
               <span className="opacity-80">Legitimacy Score:</span>

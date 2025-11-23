@@ -14,6 +14,8 @@ from elevenlabs_service import ElevenLabsService
 from gemini_service import GeminiService
 from sentiment_analysis import SentimentAnalyzer
 from vapi_service import VAPIService
+from translation_service import TranslationService
+from image_generation_service import ImageGenerationService
 from prompts import get_snooze_level, get_social_media_threat
 
 app = FastAPI(title="Passive-Aggressive Alarm Clock - AI & Voice Integration")
@@ -30,14 +32,16 @@ app.add_middleware(
 # Initialize services
 elevenlabs_service = None
 gemini_service = None
+translation_service = None
 sentiment_analyzer = None
 vapi_service = None
+image_generation_service = None
 
 # Lazy initialization of services
 def get_elevenlabs_service():
     global elevenlabs_service
-    if elevenlabs_service is None:
-        elevenlabs_service = ElevenLabsService()
+    # Always reinitialize to pick up new API keys
+    elevenlabs_service = ElevenLabsService()
     return elevenlabs_service
 
 def get_gemini_service():
@@ -58,12 +62,25 @@ def get_vapi_service():
         vapi_service = VAPIService()
     return vapi_service
 
+def get_translation_service():
+    global translation_service
+    if translation_service is None:
+        translation_service = TranslationService()
+    return translation_service
+
+def get_image_generation_service():
+    global image_generation_service
+    if image_generation_service is None:
+        image_generation_service = ImageGenerationService()
+    return image_generation_service
+
 
 # Pydantic models for request/response
 class AlarmTriggerRequest(BaseModel):
     snooze_count: int = 0
     user_id: Optional[str] = None
     wake_up_time: Optional[str] = None
+    language: Optional[str] = "en"  # Language code (default: English)
 
 
 class SnoozeRequest(BaseModel):
@@ -71,6 +88,7 @@ class SnoozeRequest(BaseModel):
     snooze_count: int
     user_id: Optional[str] = None
     transcribed_audio: Optional[str] = None
+    language: Optional[str] = "en"  # Language code (default: English)
 
 
 class ExcuseAnalysisRequest(BaseModel):
@@ -116,6 +134,24 @@ async def health():
         }
     }
 
+@app.get("/image/farm-animal")
+async def get_farm_animal_image():
+    """Generate and return a farm animal image URL.
+    
+    Returns:
+        JSON with image_url for the generated farm animal image
+    """
+    try:
+        image_service = get_image_generation_service()
+        image_url = image_service.generate_farm_animal_image_url()
+        
+        return JSONResponse(content={
+            "image_url": image_url,
+            "success": True
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
+
 
 @app.post("/alarm/trigger", response_model=AudioResponse)
 async def trigger_alarm(request: AlarmTriggerRequest):
@@ -126,15 +162,27 @@ async def trigger_alarm(request: AlarmTriggerRequest):
     """
     try:
         elevenlabs = get_elevenlabs_service()
+        translation = get_translation_service()
         
         # Get user name from request or use default
         user_name = getattr(request, 'user_name', None) or "there"
         
-        # Generate appropriate message based on snooze count (matching specification)
-        message = elevenlabs.generate_alarm_message(request.snooze_count, user_name)
+        # Get language from request (default to English)
+        language = getattr(request, 'language', None) or "en"
+        print(f"[DEBUG] ===== ALARM TRIGGER =====")
+        print(f"[DEBUG] Language received: {language}")
+        print(f"[DEBUG] Snooze count: {request.snooze_count}")
+        print(f"[DEBUG] User name: {user_name}")
         
-        # Generate audio using specification method
-        audio_data = elevenlabs.generate_alarm_voice(request.snooze_count, user_name)
+        # Generate appropriate message based on snooze count (matching specification)
+        # Use translation service instead of Gemini for translation
+        print(f"[DEBUG] Calling generate_alarm_message with language: {language}")
+        message = elevenlabs.generate_alarm_message(request.snooze_count, user_name, language, translation_service=translation)
+        print(f"[DEBUG] Generated message (after translation): {message}")
+        print(f"[DEBUG] Message length: {len(message)}")
+        
+        # Generate audio using specification method with language
+        audio_data = elevenlabs.generate_alarm_voice(request.snooze_count, user_name, language=language, translation_service=translation)
         
         # Save audio file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -292,18 +340,24 @@ async def handle_snooze(request: SnoozeRequest, background_tasks: BackgroundTask
                 print(f"Error analyzing sentiment: {e}")
                 # Continue without sentiment analysis
         
+        # Get language from request (default to English)
+        language = getattr(request, 'language', None) or "en"
+        print(f"[DEBUG] Snooze handler - Language: {language}, Snooze count: {request.snooze_count}")
+        
         # Step 2: Generate roast with Gemini, incorporating sentiment analysis
         # The more they snooze AND the more insincere they sound, the meaner the response
         result = gemini.generate_combined_response(
             request.excuse or "", 
             request.snooze_count,
             None,  # user_history
-            sentiment_result  # Pass sentiment to make response meaner
+            sentiment_result,  # Pass sentiment to make response meaner
+            language  # Pass language for multilingual support
         )
         roast_text = result.get("roast", "")
+        print(f"[DEBUG] Generated roast: {roast_text}")
         
         # Step 3: Convert roast to voice with ElevenLabs (matches specification)
-        audio_data = elevenlabs.generate_audio_for_text(roast_text, request.snooze_count)
+        audio_data = elevenlabs.generate_audio_for_text(roast_text, request.snooze_count, language=language)
         
         # Step 4: Save to storage (or could stream directly)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -451,7 +505,8 @@ async def generate_countdown_audio(request: Dict[str, Any]):
     
     Request body:
     {
-        "text": "5" or "4" or "3" or "2" or "1" or "Text sent"
+        "text": "5" or "4" or "3" or "2" or "1" or "Text sent",
+        "language": "en" (optional, default: English)
     }
     """
     try:
@@ -459,21 +514,49 @@ async def generate_countdown_audio(request: Dict[str, Any]):
         if not text:
             raise HTTPException(status_code=400, detail="Text is required")
         
+        # Get language from request (default to English)
+        language = request.get("language", "en")
+        print(f"[DEBUG Countdown] ===== COUNTDOWN AUDIO REQUEST =====")
+        print(f"[DEBUG Countdown] Original text: {text}")
+        print(f"[DEBUG Countdown] Target language: {language}")
+        
+        # Translate countdown messages if not English using Google Translate API
+        translated_text = text
+        if language != "en":
+            try:
+                translation = get_translation_service()
+                print(f"[DEBUG Countdown] Translation service initialized: {translation is not None}")
+                translated_text = translation.translate_text(text, language)
+                print(f"[DEBUG Countdown] ✅ Translated countdown text: '{translated_text}' (from '{text}')")
+            except Exception as e:
+                print(f"[ERROR Countdown] ❌ Error translating countdown text: {e}")
+                import traceback
+                traceback.print_exc()
+                translated_text = text  # Fall back to original
+                print(f"[DEBUG Countdown] ⚠️ Falling back to original text: {translated_text}")
+        else:
+            print(f"[DEBUG Countdown] English language, skipping translation")
+        
         elevenlabs = get_elevenlabs_service()
         
         # Use a consistent voice for countdown (sarcastic friend voice - Bella)
         # This matches the snooze 3 level voice
         voice_id = Config.VOICE_SARCASTIC  # Bella voice
         
-        # Generate audio
+        # Generate audio with language support - using 8/10 angry voice settings
+        print(f"[DEBUG Countdown] Generating audio with ElevenLabs...")
+        print(f"[DEBUG Countdown] Text to speak: {translated_text}")
+        print(f"[DEBUG Countdown] Language code: {language}")
         audio_data = elevenlabs.generate_voice(
-            text=text,
+            text=translated_text,
             voice_id=voice_id,
-            stability=0.5,
-            similarity_boost=0.75,
-            style=0.6,
-            use_speaker_boost=True
+            stability=0.2,  # Lower stability = more variation/expressiveness (8/10 angry)
+            similarity_boost=0.9,  # Higher similarity = more consistent voice character
+            style=0.9,  # Higher style = more expressive/emotional (8/10 angry)
+            use_speaker_boost=True,
+            language=language
         )
+        print(f"[DEBUG Countdown] ✅ Countdown audio generated successfully")
         
         # Return base64 encoded audio
         import base64

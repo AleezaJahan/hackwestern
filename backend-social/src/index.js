@@ -142,13 +142,15 @@ async function handleSnoozeEvent(request, db, escalation, integration) {
   }
 
   try {
-    // Get or create user with crush_phone_number
+    // Get or create user with crush_phone_number and settings
     const user = await db.getOrCreateUser(body.user_id, {
       email: body.email || null,
       phone_number: body.phone_number || null,
       mom_phone_number: body.mom_phone_number || null,
       crush_phone_number: body.crush_phone_number || null,
       twitter_handle: body.twitter_handle || null,
+      enable_social_media_threats: body.enable_social_media_threats !== false, // Default to true if not specified
+      enable_sms_threats: body.enable_sms_threats !== false, // Default to true if not specified
     });
 
     // Record snooze in database

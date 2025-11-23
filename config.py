@@ -22,6 +22,9 @@ class Config:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")  # Using latest flash model
     
+    # Google Cloud Translation API Configuration
+    GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY", "") or os.getenv("GEMINI_API_KEY", "")  # Can use same key
+    
     # VAPI Configuration
     VAPI_API_KEY = os.getenv("VAPI_API_KEY", "")
     VAPI_API_URL = "https://api.vapi.ai"

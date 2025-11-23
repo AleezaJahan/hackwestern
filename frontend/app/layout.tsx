@@ -6,7 +6,7 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Passive-Aggressive Alarm Clock',
+  title: '🌙 Rise & Roast',
   description: 'Voice-powered alarm that scolds you for snoozing and threatens to tweet your wake-up time',
 }
 
@@ -17,6 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+      </head>
       <body className={inter.className}>
         {children}
         <Toaster 

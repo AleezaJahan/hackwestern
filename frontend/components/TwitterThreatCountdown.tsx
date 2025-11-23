@@ -4,19 +4,19 @@ import { useState, useEffect, useRef } from 'react'
 import { generateCountdownAudio } from '@/lib/api'
 import { getSettings } from '@/lib/storage'
 
-interface CrushTextCountdownProps {
+interface TwitterThreatCountdownProps {
   isActive: boolean
-  crushPhoneNumber?: string
+  twitterHandle?: string
   onCountdownComplete: () => void
   onCancel?: () => void
 }
 
-export default function CrushTextCountdown({
+export default function TwitterThreatCountdown({
   isActive,
-  crushPhoneNumber,
+  twitterHandle,
   onCountdownComplete,
   onCancel
-}: CrushTextCountdownProps) {
+}: TwitterThreatCountdownProps) {
   const [countdown, setCountdown] = useState(5)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isActiveRef = useRef(false)
@@ -39,7 +39,7 @@ export default function CrushTextCountdown({
   // Play ONE audio file - wait for it to finish
   const playAudio = async (text: string): Promise<void> => {
     if (cancelledRef.current || !isActiveRef.current) {
-      console.log('🚫 [Crush] Audio cancelled before start:', text)
+      console.log('🚫 [Twitter] Audio cancelled before start:', text)
       return Promise.resolve()
     }
 
@@ -48,7 +48,7 @@ export default function CrushTextCountdown({
 
     return new Promise(async (resolve) => {
       if (cancelledRef.current || !isActiveRef.current) {
-        console.log('🚫 [Crush] Audio cancelled in promise:', text)
+        console.log('🚫 [Twitter] Audio cancelled in promise:', text)
         resolve()
         return
       }
@@ -56,12 +56,12 @@ export default function CrushTextCountdown({
       try {
         const settings = getSettings()
         const language = settings.language || 'en'
-        console.log('📞 [Crush] Calling API for:', text, 'Language:', language)
+        console.log('📞 [Twitter] Calling API for:', text, 'Language:', language)
         const audioUrl = await generateCountdownAudio(text, language)
-        console.log('✅ [Crush] API returned audio URL for:', text)
+        console.log('✅ [Twitter] API returned audio URL for:', text)
         
         if (cancelledRef.current || !isActiveRef.current) {
-          console.log('🚫 [Crush] Cancelled after API call:', text)
+          console.log('🚫 [Twitter] Cancelled after API call:', text)
           URL.revokeObjectURL(audioUrl)
           resolve()
           return
@@ -75,7 +75,7 @@ export default function CrushTextCountdown({
         const done = () => {
           if (finished) return
           finished = true
-          console.log('🏁 [Crush] Audio finished:', text)
+          console.log('🏁 [Twitter] Audio finished:', text)
           stopAudio()
           resolve()
         }
@@ -85,7 +85,7 @@ export default function CrushTextCountdown({
         }
 
         audio.onerror = (e) => {
-          console.error('❌ [Crush] Audio error:', text, e)
+          console.error('❌ [Twitter] Audio error:', text, e)
           done()
         }
 
@@ -94,9 +94,9 @@ export default function CrushTextCountdown({
           if (cancelledRef.current || !isActiveRef.current || finished) return
           try {
             await audio.play()
-            console.log('▶️ [Crush] Now playing:', text)
+            console.log('▶️ [Twitter] Now playing:', text)
           } catch (e) {
-            console.error('❌ [Crush] Play failed:', text, e)
+            console.error('❌ [Twitter] Play failed:', text, e)
             done()
           }
         }
@@ -116,13 +116,13 @@ export default function CrushTextCountdown({
         // Max wait
         setTimeout(() => {
           if (!finished) {
-            console.log('⏱️ [Crush] Timeout for:', text)
+            console.log('⏱️ [Twitter] Timeout for:', text)
             done()
           }
         }, 3000)
 
       } catch (error) {
-        console.error('❌ [Crush] Generation error:', text, error)
+        console.error('❌ [Twitter] Generation error:', text, error)
         resolve()
       }
     })
@@ -145,32 +145,32 @@ export default function CrushTextCountdown({
 
     // PREVENT DUPLICATES - only run once
     if (isActiveRef.current) {
-      console.warn('⚠️ [Crush] Already active, IGNORING duplicate trigger')
+      console.warn('⚠️ [Twitter] Already active, IGNORING duplicate trigger')
       return
     }
 
-    console.log('🎯 [Crush] ACTIVATING - Starting countdown sequence')
+    console.log('🎯 [Twitter] ACTIVATING - Starting countdown sequence')
     isActiveRef.current = true
     cancelledRef.current = false
     setCountdown(5)
 
     const runSequence = async () => {
-      console.log('🚀 [Crush] ===== STARTING SEQUENCE =====')
+      console.log('🚀 [Twitter] ===== STARTING SEQUENCE =====')
       
       // 1. Warning (ONCE)
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 1: Warning message')
-        await playAudio("I'm going to text your crush in 5 seconds if you don't wake up")
+        console.log('📢 [Twitter] Step 1: Warning message')
+        await playAudio("I'm going to post an embarrassing message in 5 seconds if you don't wake up")
       }
       if (cancelledRef.current || !isActiveRef.current) {
-        console.log('🛑 [Crush] Cancelled after step 1')
+        console.log('🛑 [Twitter] Cancelled after step 1')
         return
       }
       await new Promise(r => setTimeout(r, 500))
 
       // 2. Countdown 5
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 2: Countdown 5')
+        console.log('📢 [Twitter] Step 2: Countdown 5')
         setCountdown(5)
         await playAudio("5")
       }
@@ -179,7 +179,7 @@ export default function CrushTextCountdown({
 
       // 3. Countdown 4
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 3: Countdown 4')
+        console.log('📢 [Twitter] Step 3: Countdown 4')
         setCountdown(4)
         await playAudio("4")
       }
@@ -188,7 +188,7 @@ export default function CrushTextCountdown({
 
       // 4. Countdown 3
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 4: Countdown 3')
+        console.log('📢 [Twitter] Step 4: Countdown 3')
         setCountdown(3)
         await playAudio("3")
       }
@@ -197,7 +197,7 @@ export default function CrushTextCountdown({
 
       // 5. Countdown 2
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 5: Countdown 2')
+        console.log('📢 [Twitter] Step 5: Countdown 2')
         setCountdown(2)
         await playAudio("2")
       }
@@ -206,29 +206,29 @@ export default function CrushTextCountdown({
 
       // 6. Countdown 1
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 6: Countdown 1')
+        console.log('📢 [Twitter] Step 6: Countdown 1')
         setCountdown(1)
         await playAudio("1")
       }
       if (cancelledRef.current || !isActiveRef.current) return
       await new Promise(r => setTimeout(r, 300))
 
-      // 7. Text sent
+      // 7. Posted message
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 7: Text sent message')
+        console.log('📢 [Twitter] Step 7: Posted message')
         setCountdown(0)
-        await playAudio("text sent to crush loser")
+        await playAudio("posted to Twitter loser")
       }
       if (cancelledRef.current || !isActiveRef.current) return
       await new Promise(r => setTimeout(r, 1000))
 
       // 8. Final
       if (!cancelledRef.current && isActiveRef.current) {
-        console.log('📢 [Crush] Step 8: Final message')
+        console.log('📢 [Twitter] Step 8: Final message')
         await playAudio("now wake up")
       }
 
-      console.log('✅ [Crush] ===== SEQUENCE COMPLETE =====')
+      console.log('✅ [Twitter] ===== SEQUENCE COMPLETE =====')
       
       if (!cancelledRef.current && isActiveRef.current) {
         isActiveRef.current = false
@@ -242,7 +242,7 @@ export default function CrushTextCountdown({
     }, 100)
 
     return () => {
-      console.log('🧹 [Crush] Cleanup - stopping sequence')
+      console.log('🧹 [Twitter] Cleanup - stopping sequence')
       clearTimeout(timer)
       cancelledRef.current = true
       isActiveRef.current = false
@@ -251,14 +251,14 @@ export default function CrushTextCountdown({
   }, [isActive]) // REMOVED onCountdownComplete from dependencies
 
   const handleCancel = () => {
-    console.log('🛑 CANCEL - STOPPING EVERYTHING')
+    console.log('🛑 [Twitter] CANCEL - STOPPING EVERYTHING')
     cancelledRef.current = true
     isActiveRef.current = false
     stopAudio()
     if (onCancel) onCancel()
   }
 
-  if (!isActive || !crushPhoneNumber) {
+  if (!isActive || !twitterHandle) {
     return null
   }
 
@@ -266,10 +266,10 @@ export default function CrushTextCountdown({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-purple-950/95 backdrop-blur-md text-white rounded-2xl sm:rounded-lg shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4 border-4 border-purple-800/80 animate-pulse max-h-[90vh] overflow-y-auto">
         <div className="text-center">
-          <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">💕</div>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 px-2">Texting Your Crush!</h2>
+          <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">🐦</div>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 px-2">Posting to Twitter!</h2>
           <p className="text-base sm:text-lg md:text-xl mb-4 sm:mb-6 px-2">
-            Sending romantic text to your crush in...
+            Your embarrassing wake-up stats will be posted in...
           </p>
           
           <div className="text-6xl sm:text-7xl md:text-8xl font-bold mb-4 sm:mb-6 text-purple-300">
@@ -277,7 +277,7 @@ export default function CrushTextCountdown({
           </div>
           
           <p className="text-sm sm:text-base md:text-lg mb-4 opacity-90 px-2">
-            "Hey babe, I was up all night thinking about how to confess my feelings for you, and now I can't wake up. Call me please."
+            Everyone will see how many times you snoozed. Better wake up now! 😱
           </p>
           
           {onCancel && countdown > 0 && (

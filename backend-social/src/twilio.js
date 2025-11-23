@@ -19,6 +19,79 @@ export class TwilioService {
   }
 
   /**
+   * Send MMS (Multimedia Message) via Twilio
+   */
+  async sendMMS(to, message, mediaUrl) {
+    if (!this.isConfigured) {
+      console.warn('Twilio not configured. Returning mock response.');
+      return {
+        success: true,
+        message_sid: `mock_${Date.now()}`,
+        message: `Mock MMS sent to ${to} with image`,
+      };
+    }
+
+    try {
+      const credentials = btoa(`${this.accountSid}:${this.authToken}`);
+      const formData = new URLSearchParams();
+      
+      if (this.phoneNumber) {
+        formData.append('From', this.phoneNumber);
+      } else if (this.messagingServiceSid) {
+        formData.append('MessagingServiceSid', this.messagingServiceSid);
+      } else {
+        throw new Error('Neither phone number nor messaging service SID configured');
+      }
+      
+      formData.append('To', to);
+      formData.append('Body', message || ''); // Allow empty body for image-only MMS
+      
+      // Twilio supports multiple MediaUrl parameters for multiple images
+      // For now, we'll send one image
+      if (mediaUrl) {
+        formData.append('MediaUrl', mediaUrl);
+        console.log(`📸 Twilio MMS: MediaUrl = ${mediaUrl}`);
+      } else {
+        console.warn('⚠️ Twilio MMS: No MediaUrl provided!');
+      }
+
+      console.log(`📤 Twilio MMS: Sending to ${to} from ${this.phoneNumber || this.messagingServiceSid}`);
+
+      const response = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${credentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData.toString(),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error(`❌ Twilio MMS API error: ${response.status} - ${error}`);
+        throw new Error(`Twilio API error: ${error || response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Twilio MMS: Success! Message SID: ${data.sid}, Status: ${data.status}`);
+
+      return {
+        success: true,
+        message_sid: data.sid,
+        status: data.status,
+        message: 'MMS sent successfully',
+      };
+    } catch (error) {
+      console.error('Error sending MMS:', error);
+      return {
+        success: false,
+        error: error.message,
+        message: `Failed to send MMS: ${error.message}`,
+      };
+    }
+  }
+
+  /**
    * Send SMS via Twilio
    */
   async sendSMS(to, message) {

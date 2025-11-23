@@ -31,12 +31,12 @@ export default function SocialMediaThreat({ snoozeCount, nextThreshold, snoozesU
 
   if (snoozeCount >= 7) {
     return (
-      <div className="w-full p-6 bg-red-600 text-white rounded-lg shadow-lg border-4 border-red-800 animate-pulse">
+      <div className="w-full p-6 bg-purple-600/40 backdrop-blur-md text-white rounded-3xl shadow-2xl border-2 border-purple-400/50 animate-pulse">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-4xl">🚨</span>
           <div>
-            <h3 className="text-2xl font-bold">NUCLEAR OPTION ENGAGED</h3>
-            <p className="text-red-100">Your embarrassing stats have been posted!</p>
+            <h3 className="text-2xl font-bold">SOCIAL MEDIA POSTED</h3>
+            <p className="text-purple-200">Your embarrassing stats have been posted!</p>
           </div>
         </div>
         <p className="text-lg mt-4">
@@ -48,12 +48,12 @@ export default function SocialMediaThreat({ snoozeCount, nextThreshold, snoozesU
 
   if (snoozeCount >= 5) {
     return (
-      <div className="w-full p-6 bg-orange-600 text-white rounded-lg shadow-lg border-4 border-orange-800">
+      <div className="w-full p-6 bg-purple-500/40 backdrop-blur-md text-white rounded-3xl shadow-2xl border-2 border-purple-400/50">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-4xl">⚠️</span>
           <div>
             <h3 className="text-2xl font-bold">SOCIAL MEDIA THREAT ACTIVE</h3>
-            <p className="text-orange-100">You're in the danger zone!</p>
+            <p className="text-purple-200">You're in the danger zone!</p>
           </div>
         </div>
         <p className="text-lg mt-4">
@@ -65,12 +65,12 @@ export default function SocialMediaThreat({ snoozeCount, nextThreshold, snoozesU
 
   if (countdown !== null && countdown > 0) {
     return (
-      <div className="w-full p-6 bg-yellow-500 text-yellow-900 rounded-lg shadow-lg border-4 border-yellow-600">
+      <div className="w-full p-6 bg-purple-700/40 backdrop-blur-md text-white rounded-3xl shadow-2xl border-2 border-purple-400/50">
         <div className="flex items-center gap-3 mb-2">
           <span className="text-4xl">⏰</span>
           <div>
             <h3 className="text-2xl font-bold">WARNING: Approaching Threshold</h3>
-            <p className="text-yellow-800">You're {countdown} {countdown === 1 ? 'snooze' : 'snoozes'} away from escalation!</p>
+            <p className="text-purple-200">You're {countdown} {countdown === 1 ? 'snooze' : 'snoozes'} away from escalation!</p>
           </div>
         </div>
         {countdown === 1 && (
@@ -83,10 +83,10 @@ export default function SocialMediaThreat({ snoozeCount, nextThreshold, snoozesU
   }
 
   return (
-    <div className="w-full p-4 bg-blue-100 border-2 border-blue-300 rounded-lg">
+    <div className="w-full p-4 bg-purple-800/30 backdrop-blur-md border-2 border-purple-300/30 rounded-2xl">
       <div className="flex items-center gap-2">
         <span className="text-2xl">💡</span>
-        <p className="text-blue-800">
+        <p className="text-white">
           You're at {snoozeCount} snoozes. Keep it under control! 😊
         </p>
       </div>

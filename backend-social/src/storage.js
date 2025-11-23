@@ -57,7 +57,22 @@ export class SimpleStorage {
     const store = await this._getStore();
     
     if (store.users[userId]) {
-      return store.users[userId];
+      // Update existing user with new data (merge)
+      const existingUser = store.users[userId];
+      const updatedUser = {
+        ...existingUser,
+        email: userData.email !== undefined ? userData.email : existingUser.email,
+        phone_number: userData.phone_number !== undefined ? userData.phone_number : existingUser.phone_number,
+        mom_phone_number: userData.mom_phone_number !== undefined ? userData.mom_phone_number : existingUser.mom_phone_number,
+        crush_phone_number: userData.crush_phone_number !== undefined ? userData.crush_phone_number : existingUser.crush_phone_number,
+        twitter_handle: userData.twitter_handle !== undefined ? userData.twitter_handle : existingUser.twitter_handle,
+        enable_social_media_threats: userData.enable_social_media_threats !== undefined ? userData.enable_social_media_threats : existingUser.enable_social_media_threats,
+        enable_sms_threats: userData.enable_sms_threats !== undefined ? userData.enable_sms_threats : existingUser.enable_sms_threats,
+        updated_at: new Date().toISOString(),
+      };
+      store.users[userId] = updatedUser;
+      await this._saveStore(store);
+      return updatedUser;
     }
 
     // Create new user
@@ -69,6 +84,8 @@ export class SimpleStorage {
       mom_phone_number: userData.mom_phone_number || null,
       crush_phone_number: userData.crush_phone_number || null,
       twitter_handle: userData.twitter_handle || null,
+      enable_social_media_threats: userData.enable_social_media_threats !== undefined ? userData.enable_social_media_threats : true,
+      enable_sms_threats: userData.enable_sms_threats !== undefined ? userData.enable_sms_threats : true,
       settings: userData.settings || {},
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -247,6 +264,8 @@ export class SimpleStorage {
       snooze_threshold: triggerData.snooze_threshold,
       action_type: triggerData.action_type,
       triggered_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       executed: triggerData.executed || false,
       execution_result: triggerData.execution_result || null,
     };
@@ -255,6 +274,31 @@ export class SimpleStorage {
     await this._saveStore(store);
     
     return trigger;
+  }
+
+  /**
+   * Get escalation triggers for a user
+   */
+  async getEscalationTriggers(userId, filters = {}) {
+    const user = await this.getOrCreateUser(userId);
+    const store = await this._getStore();
+
+    let triggers = store.escalation_triggers.filter(
+      (t) => t.user_id === user.id
+    );
+
+    // Apply filters
+    if (filters.action_type) {
+      triggers = triggers.filter((t) => t.action_type === filters.action_type);
+    }
+    if (filters.snooze_threshold !== undefined) {
+      triggers = triggers.filter((t) => t.snooze_threshold === filters.snooze_threshold);
+    }
+    if (filters.executed !== undefined) {
+      triggers = triggers.filter((t) => t.executed === filters.executed);
+    }
+
+    return triggers;
   }
 
   /**

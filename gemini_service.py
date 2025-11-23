@@ -1,6 +1,6 @@
 """Google Gemini API integration for excuse analysis and roast generation."""
 import google.generativeai as genai
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from config import Config
 from prompts import get_roast_prompt, EXCUSE_ANALYSIS_PROMPT, get_snooze_level
 
@@ -191,7 +191,7 @@ Response format (JSON):
                 "recommended_intensity": get_snooze_level(snooze_count)
             }
     
-    def generate_roast(self, snooze_count: int, excuse: str = None, sentiment_analysis: Dict = None) -> str:
+    def generate_roast(self, snooze_count: int, excuse: str = None, sentiment_analysis: Dict = None, language: str = "en") -> str:
         """Generate a snarky roast based on snooze count - escalating meanness.
         
         Args:
@@ -311,7 +311,26 @@ Response format (JSON):
             if specific_details:
                 personalization_context = f'\n\nPERSONALIZATION REQUIRED:\n- Use these specific details from their excuse: {", ".join(specific_details)}\n- Reference their excuse category: {excuse_category}\n- Call out their personality traits: {", ".join(personality_traits)}\n- Make fun of their {tone} tone\n- Quote or reference their exact words: "{excuse}"\n- Make it PERSONAL and MEAN - don\'t be generic!\n'
         
-        prompt = f"""{base_prompt}{excuse_text}{sentiment_context}{personalization_context}
+        # Add language instruction if not English
+        language_instruction = ""
+        if language != "en":
+            language_names = {
+                "es": "Spanish",
+                "fr": "French",
+                "de": "German",
+                "it": "Italian",
+                "pt": "Portuguese",
+                "ja": "Japanese",
+                "ko": "Korean",
+                "zh": "Chinese",
+                "ru": "Russian",
+                "ar": "Arabic",
+                "hi": "Hindi"
+            }
+            target_language = language_names.get(language, language.upper())
+            language_instruction = f"\n\nIMPORTANT: Generate your response in {target_language}. All text must be in {target_language}, not English."
+
+        prompt = f"""{base_prompt}{excuse_text}{sentiment_context}{personalization_context}{language_instruction}
 
 Generate a response that:
 - Is 1-2 sentences max
@@ -338,6 +357,21 @@ Return ONLY the roast text, no JSON, no quotes."""
             if roast.lower().startswith("json"):
                 roast = roast[4:].strip()
             
+            # Translate roast if not English (using translation service)
+            if language != "en":
+                try:
+                    from translation_service import TranslationService
+                    translation = TranslationService()
+                    print(f"[DEBUG Gemini] Translating roast from English to {language}")
+                    print(f"[DEBUG Gemini] Original roast: {roast}")
+                    translated_roast = translation.translate_text(roast, language)
+                    print(f"[DEBUG Gemini] Translated roast: {translated_roast}")
+                    return translated_roast
+                except Exception as e:
+                    print(f"[WARNING] Could not translate roast, using original: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
             return roast
             
         except Exception as e:
@@ -353,7 +387,7 @@ Return ONLY the roast text, no JSON, no quotes."""
             
             return fallback_roasts.get(min(snooze_count, 5), f"'{excuse}'? After {snooze_count} snoozes? You're beyond help. GET UP!" if excuse else f"{snooze_count} snoozes? You're beyond help. GET UP!")
     
-    def generate_combined_response(self, excuse: str, snooze_count: int, user_history: list = None, sentiment_analysis: Dict = None) -> Dict[str, Any]:
+    def generate_combined_response(self, excuse: str, snooze_count: int, user_history: list = None, sentiment_analysis: Dict = None, language: str = "en") -> Dict[str, Any]:
         """Analyze excuse and generate roast in one call - matching specification.
         
         Args:
@@ -361,6 +395,7 @@ Return ONLY the roast text, no JSON, no quotes."""
             snooze_count: Number of times user has snoozed
             user_history: List of past excuses (optional)
             sentiment_analysis: Optional sentiment analysis from voice/text
+            language: Language code (e.g., 'en', 'es', 'fr', etc.)
             
         Returns:
             Dictionary with analysis and roast
@@ -369,14 +404,28 @@ Return ONLY the roast text, no JSON, no quotes."""
         analysis = self.analyze_excuse(excuse, snooze_count, user_history, sentiment_analysis)
         
         # Extract roast from analysis or generate separately with sentiment
-        roast = analysis.get("roast") or self.generate_roast(snooze_count, excuse, sentiment_analysis)
+        # generate_roast will handle translation internally
+        roast = analysis.get("roast") or self.generate_roast(snooze_count, excuse, sentiment_analysis, language)
         
         # If sentiment shows insincerity, make the roast even meaner
         if sentiment_analysis and sentiment_analysis.get("sincerity_score", 0.5) < 0.5:
             # Enhance the roast to be meaner if they're lying
-            enhanced_roast = self.generate_roast(snooze_count, excuse, sentiment_analysis)
+            enhanced_roast = self.generate_roast(snooze_count, excuse, sentiment_analysis, language)
             if enhanced_roast and len(enhanced_roast) > len(roast):
                 roast = enhanced_roast
+        
+        # Translate roast if not English (in case it wasn't translated in generate_roast)
+        if language != "en" and roast:
+            try:
+                from translation_service import TranslationService
+                translation = TranslationService()
+                print(f"[DEBUG Gemini] Final translation check - Language: {language}, Roast: {roast[:50]}...")
+                translated_roast = translation.translate_text(roast, language)
+                if translated_roast != roast:
+                    print(f"[DEBUG Gemini] Roast was translated: {translated_roast[:50]}...")
+                    roast = translated_roast
+            except Exception as e:
+                print(f"[WARNING] Could not translate roast in generate_combined_response: {e}")
         
         return {
             "analysis": analysis,

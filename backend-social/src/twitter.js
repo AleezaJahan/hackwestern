@@ -139,10 +139,12 @@ export class TwitterService {
       
       if (this.apiKey && this.apiSecret && this.accessToken && this.accessTokenSecret) {
         console.log('🐦 Using OAuth 1.0a authentication');
-        authHeader = await this.generateOAuthSignature('POST', endpoint);
+        // For Twitter API v2 with JSON body, OAuth signature should NOT include body params
+        // The signature is based on the URL and OAuth params only
+        authHeader = await this.generateOAuthSignature('POST', endpoint, {});
         console.log('🐦 OAuth header generated:', authHeader ? 'YES' : 'NO');
         if (authHeader) {
-          console.log('🐦 OAuth header preview:', authHeader.substring(0, 50) + '...');
+          console.log('🐦 OAuth header preview:', authHeader.substring(0, 80) + '...');
         }
       } else {
         console.log('🐦 OAuth 1.0a credentials incomplete, falling back to Bearer Token');
@@ -170,6 +172,19 @@ export class TwitterService {
 
       console.log('🐦 Response status:', response.status);
       console.log('🐦 Response ok:', response.ok);
+      
+      // Check rate limit headers
+      const rateLimitRemaining = response.headers.get('x-rate-limit-remaining');
+      const rateLimitReset = response.headers.get('x-rate-limit-reset');
+      if (rateLimitRemaining !== null) {
+        console.log('🐦 Rate limit remaining:', rateLimitRemaining);
+      }
+      if (rateLimitReset !== null) {
+        const resetTime = new Date(parseInt(rateLimitReset) * 1000);
+        console.log('🐦 Rate limit resets at:', resetTime.toISOString());
+        const minutesUntilReset = Math.ceil((parseInt(rateLimitReset) * 1000 - Date.now()) / 60000);
+        console.log('🐦 Minutes until reset:', minutesUntilReset);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -180,6 +195,18 @@ export class TwitterService {
         } catch {
           error = { detail: errorText };
         }
+        
+        // Provide more helpful error message for rate limits
+        if (response.status === 429) {
+          let rateLimitMessage = 'Twitter API rate limit exceeded.';
+          if (rateLimitReset) {
+            const resetTime = new Date(parseInt(rateLimitReset) * 1000);
+            const minutesUntilReset = Math.ceil((parseInt(rateLimitReset) * 1000 - Date.now()) / 60000);
+            rateLimitMessage += ` Rate limit resets in ${minutesUntilReset} minutes (at ${resetTime.toLocaleTimeString()}).`;
+          }
+          throw new Error(rateLimitMessage);
+        }
+        
         throw new Error(`Twitter API error: ${error.detail || error.title || response.statusText}`);
       }
 
@@ -335,24 +362,14 @@ export class TwitterService {
    * Generate social media threat message
    */
   generateThreatMessage(snoozeCount, wakeUpTime, userHandle = null) {
-    const handle = userHandle ? `@${userHandle} ` : '';
+    // Add timestamp to make each tweet unique (Twitter doesn't allow duplicates)
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const dateStr = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const timestamp = `${dateStr} at ${timeStr}`;
     
-    const messages = [
-      `🚨 PUBLIC SERVICE ANNOUNCEMENT 🚨\n\n${handle}has snoozed their alarm ${snoozeCount} times today.\nWake-up time: ${wakeUpTime}\n\nTheir excuse? Probably something like "just 5 more minutes" 🥱\n\nIf you know this person, maybe check if they're still breathing? Just kidding... (or am I?)\n\n#SnoozeChronicles #GetYourLifeTogether`,
-      
-      `⚠️ WAKE UP ALERT ⚠️\n\n${handle}has hit snooze ${snoozeCount} times. Final wake-up: ${wakeUpTime}\n\nThis is your friendly reminder that sleep is important, but so is having a functioning alarm clock 😴\n\n#SnoozeCount #WakeUpChallenge`,
-      
-      `📢 URGENT: SNOOZE CRISIS 📢\n\n${handle}has now snoozed ${snoozeCount} times.\nActual wake-up: ${wakeUpTime}\n\nAt this point, we're not sure if they're trying to break a world record or just really committed to being late 🤷‍♂️\n\n#SnoozeMaster #StillInBed`,
-    ];
-
-    // Select message based on snooze count
-    if (snoozeCount >= 10) {
-      return messages[0]; // Most aggressive
-    } else if (snoozeCount >= 7) {
-      return messages[1]; // Moderate
-    } else {
-      return messages[2]; // Mild
-    }
+    // Simple message: "eat, sleep, repeat" with timestamp
+    return `eat, sleep, repeat\n\n${timestamp}`;
   }
 
   /**
