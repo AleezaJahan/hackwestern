@@ -282,27 +282,38 @@ async def handle_snooze(request: SnoozeRequest, background_tasks: BackgroundTask
         elevenlabs = get_elevenlabs_service()
         analyzer = get_sentiment_analyzer()
         
-        # Step 1: Generate roast with Gemini (matches specification)
-        result = gemini.generate_combined_response(request.excuse or "", request.snooze_count)
+        # Step 1: Analyze sentiment FIRST (if excuse provided) to influence roast meanness
+        sentiment_result = None
+        text_to_analyze = request.transcribed_audio or request.excuse
+        if text_to_analyze:
+            try:
+                sentiment_result = analyzer.analyze_sentiment(text_to_analyze)
+            except Exception as e:
+                print(f"Error analyzing sentiment: {e}")
+                # Continue without sentiment analysis
+        
+        # Step 2: Generate roast with Gemini, incorporating sentiment analysis
+        # The more they snooze AND the more insincere they sound, the meaner the response
+        result = gemini.generate_combined_response(
+            request.excuse or "", 
+            request.snooze_count,
+            None,  # user_history
+            sentiment_result  # Pass sentiment to make response meaner
+        )
         roast_text = result.get("roast", "")
         
-        # Step 2: Convert roast to voice with ElevenLabs (matches specification)
+        # Step 3: Convert roast to voice with ElevenLabs (matches specification)
         audio_data = elevenlabs.generate_audio_for_text(roast_text, request.snooze_count)
         
-        # Step 3: Save to storage (or could stream directly)
+        # Step 4: Save to storage (or could stream directly)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"snooze_{request.snooze_count}_{timestamp}.mp3"
         audio_path = elevenlabs.save_audio(audio_data, filename)
         
-        # Step 4: Read audio as base64 for data URL (matching specification format)
+        # Step 5: Read audio as base64 for data URL (matching specification format)
         import base64
         audio_base64 = base64.b64encode(audio_data).decode('utf-8')
         audio_data_url = f"data:audio/mpeg;base64,{audio_base64}"
-        
-        # Step 5: Analyze sentiment if transcribed audio is provided
-        sentiment_result = None
-        if request.transcribed_audio:
-            sentiment_result = analyzer.analyze_sentiment(request.transcribed_audio)
         
         level = get_snooze_level(request.snooze_count)
         escalation_level = "critical" if request.snooze_count >= 3 else "warning"

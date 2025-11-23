@@ -15,4 +15,5 @@ ENV/
 *.ogg
 audio_output/
 temp/
+.dev.vars
 

@@ -14,8 +14,8 @@ export class TwitterService {
     // Twitter API v2 endpoint
     this.apiUrl = 'https://api.twitter.com/2';
     
-    // Check if credentials are available
-    this.isConfigured = !!(this.accessToken && this.accessTokenSecret && this.apiKey && this.apiSecret);
+    // Check if credentials are available - Bearer Token alone is sufficient for API v2
+    this.isConfigured = !!(this.bearerToken || (this.accessToken && this.accessTokenSecret && this.apiKey && this.apiSecret));
   }
 
   /**
@@ -124,26 +124,35 @@ export class TwitterService {
 
       // If image data is provided, upload it first
       if (imageData) {
-        // Twitter Media API endpoint (v1.1)
+        // Twitter Media API endpoint (v1.1) - Note: May require OAuth 1.0a instead of Bearer Token
         const mediaEndpoint = 'https://upload.twitter.com/1.1/media/upload.json';
         
-        // Upload image
-        const formData = new FormData();
-        formData.append('media', imageData);
+        try {
+          // Upload image
+          const formData = new FormData();
+          formData.append('media', imageData);
 
-        const mediaResponse = await fetch(mediaEndpoint, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.bearerToken}`,
-          },
-          body: formData,
-        });
+          const mediaResponse = await fetch(mediaEndpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.bearerToken}`,
+            },
+            body: formData,
+          });
 
-        if (mediaResponse.ok) {
-          const mediaData = await mediaResponse.json();
-          mediaId = mediaData.media_id_string;
-        } else {
-          console.warn('Failed to upload image, posting tweet without image');
+          if (mediaResponse.ok) {
+            const mediaData = await mediaResponse.json();
+            mediaId = mediaData.media_id_string;
+            console.log('Image uploaded successfully, media_id:', mediaId);
+          } else {
+            const errorText = await mediaResponse.text();
+            console.warn('Failed to upload image:', mediaResponse.status, errorText);
+            console.warn('Note: Media uploads may require OAuth 1.0a credentials instead of Bearer Token');
+            // Continue without image
+          }
+        } catch (uploadError) {
+          console.error('Error uploading image:', uploadError);
+          // Continue without image
         }
       }
 

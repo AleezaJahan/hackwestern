@@ -144,7 +144,6 @@ export default function SettingsPage() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Will receive text at snooze 4: "degenerate is not waking up"
               {settings.mom_phone_number && (
                 <span className="block mt-1">
                   Formatted: {formatPhoneNumber(settings.mom_phone_number)}

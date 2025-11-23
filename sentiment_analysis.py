@@ -12,7 +12,8 @@ class SentimentAnalyzer:
             raise ValueError("Gemini API key not configured")
         
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        # Use the same model as the rest of the system for consistency
+        self.model = genai.GenerativeModel(Config.GEMINI_MODEL)
     
     def analyze_sentiment(self, transcribed_text: str, audio_features: Optional[Dict] = None) -> Dict[str, Any]:
         """Analyze sentiment from transcribed speech.
@@ -32,12 +33,17 @@ class SentimentAnalyzer:
 
 Transcribed text: "{transcribed_text}"
 
+IMPORTANT: Distinguish between:
+- LEGITIMATE emotional excuses (breakups, family issues, health problems, grief) → High sincerity, genuine emotions
+- LAZY/INSINCERE excuses (just tired, don't want to, "5 more minutes") → Low sincerity, no real emotion
+
 Provide a detailed sentiment analysis including:
 1. Sentiment (positive/negative/neutral)
 2. Confidence score (0-1)
-3. Detected emotions (list of 2-3 main emotions)
-4. Sincerity score (0-1, where 0 is completely insincere/lying and 1 is genuinely sincere)
-5. Brief explanation (1 sentence)
+3. Detected emotions (list of 2-3 main emotions - e.g., sad, heartbroken, depressed, anxious, or lazy, tired, unmotivated)
+4. Sincerity score (0-1, where 0 is lazy/insincere and 1 is genuinely sincere/legitimate emotional reason)
+5. Is this a legitimate emotional excuse? (true/false) - e.g., breakup, loss, health issue, family problem
+6. Brief explanation (1 sentence)
 
 Respond in JSON format:
 {{
@@ -45,6 +51,7 @@ Respond in JSON format:
     "confidence": <0.0-1.0>,
     "emotions": ["<emotion1>", "<emotion2>"],
     "sincerity_score": <0.0-1.0>,
+    "is_legitimate_emotional": <true|false>,
     "explanation": "<brief explanation>"
 }}"""
         
@@ -71,6 +78,11 @@ Respond in JSON format:
                 result["emotions"] = ["tired", "reluctant"]
             if "sincerity_score" not in result:
                 result["sincerity_score"] = 0.3  # Default to low sincerity
+            if "is_legitimate_emotional" not in result:
+                # Check if emotions suggest legitimate emotional distress
+                emotions = result.get("emotions", [])
+                legitimate_emotions = ["sad", "heartbroken", "depressed", "anxious", "grief", "hurt", "devastated", "upset"]
+                result["is_legitimate_emotional"] = any(emotion.lower() in legitimate_emotions for emotion in emotions) or result.get("sincerity_score", 0) > 0.7
             if "explanation" not in result:
                 result["explanation"] = "Sounds like a typical excuse."
                 
@@ -84,6 +96,7 @@ Respond in JSON format:
                 "confidence": 0.5,
                 "emotions": ["tired", "reluctant"],
                 "sincerity_score": 0.2,  # Assume low sincerity
+                "is_legitimate_emotional": False,
                 "explanation": "Could not analyze sentiment properly."
             }
     
